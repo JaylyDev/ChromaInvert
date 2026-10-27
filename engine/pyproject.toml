@@ -5,12 +5,29 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "chromainvert"
 version = "0.1.0"
+description = "Perceptual video and LUT reverse-engineering engine"
+readme = "README.md"
+license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
+authors = [{ name = "ChromaInvert contributors" }]
+keywords = ["color-grading", "lut", "colour-science", "pytorch", "ffmpeg"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Video",
+]
 dependencies = ["numpy>=1.26"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
 torch = ["torch>=2.0"]
+video = ["imageio>=2.30"]
+dev = ["chromainvert[torch,video]", "pytest>=8"]
+
+[project.urls]
+Repository = "https://github.com/JaylyDev/ChromaInvert"
 
 [tool.setuptools.packages.find]
 where = ["."]

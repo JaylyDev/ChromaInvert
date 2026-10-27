@@ -14,9 +14,13 @@ Perceptual video and LUT reverse engineering engine. It recovers a smooth 3D LUT
 ## Quickstart
 
 1. Install Python 3.10 or newer with `ffmpeg` on PATH.
-2. `pip install -e ./engine`
-3. `python -m pytest engine/tests -q`
-4. `python scripts/validate_cube.py`
+2. `python -m venv .venv --system-site-packages`
+3. `.venv\Scripts\Activate.ps1`
+4. `python -m pip install -e ./engine`
+5. `python -m pytest engine/tests -q`
+6. `python scripts/validate_cube.py`
+
+The venv reuses the system GPU PyTorch install via `--system-site-packages`, so no large CUDA download is needed.
 
 ## Status
 
