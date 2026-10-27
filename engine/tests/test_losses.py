@@ -1,10 +1,13 @@
 import torch
 
 from chromainvert.losses import (
+    _SafeCbrt,
+    covariance_loss,
     gamut_loss,
     identity_prior_loss,
     moment_loss,
     quantile_loss,
+    rgb_to_oklab,
     shadow_quantile_loss,
     skin_anchor_loss,
     tv_loss,
@@ -23,6 +26,16 @@ def test_distribution_losses_positive_on_shift():
     y = x + 0.25
     assert quantile_loss(y, x).item() > 0.1
     assert moment_loss(y, x).item() > 0.1
+    assert covariance_loss(y, x).item() < 1e-6
+
+
+def test_covariance_loss_detects_saturation_change():
+    torch.manual_seed(1)
+    x = torch.rand(1024, 3)
+    luma = x.mean(dim=1, keepdim=True)
+    y = luma + 1.5 * (x - luma)
+    assert covariance_loss(y, x).item() > 0.0
+    assert covariance_loss(x, x).item() == 0.0
 
 
 def test_tv_loss():
@@ -66,6 +79,30 @@ def test_shadow_quantile_empty_mask_is_zero():
     assert shadow_quantile_loss(g, r, empty, full).item() == 0.0
     assert shadow_quantile_loss(g, r, full, empty).item() == 0.0
     assert shadow_quantile_loss(r, r, full, full).item() == 0.0
+
+
+def test_safe_cbrt_backward_sign_and_cap():
+    for value, expected in ((-0.125, 4.0 / 3.0), (0.125, 4.0 / 3.0)):
+        x = torch.tensor([value], requires_grad=True)
+        _SafeCbrt.apply(x).backward()
+        assert x.grad is not None
+        assert abs(x.grad.item() - expected) < 1e-6
+    x = torch.tensor([-1e-18], requires_grad=True)
+    _SafeCbrt.apply(x).backward()
+    assert x.grad is not None
+    assert 0.0 <= x.grad.item() <= 1e4
+
+
+def test_covariance_loss_unequal_sample_counts():
+    torch.manual_seed(2)
+    x = torch.rand(257, 3)
+    assert covariance_loss(x, x.repeat(4, 1)).item() < 1e-6
+
+
+def test_oklab_backward_finite_on_black():
+    x = torch.zeros(16, 3, requires_grad=True)
+    rgb_to_oklab(x).sum().backward()
+    assert bool(torch.isfinite(x.grad).all())
 
 
 def test_losses_differentiable():

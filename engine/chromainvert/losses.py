@@ -2,6 +2,23 @@ import torch
 import torch.nn.functional as F
 
 
+class _SafeCbrt(torch.autograd.Function):
+    @staticmethod
+    def forward(x: torch.Tensor) -> torch.Tensor:
+        return torch.sign(x) * torch.abs(x).pow(1.0 / 3.0)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output) -> None:
+        ctx.save_for_backward(inputs[0])
+
+    @staticmethod
+    def backward(ctx, grad: torch.Tensor) -> torch.Tensor:
+        (x,) = ctx.saved_tensors
+        g = torch.abs(x).pow(-2.0 / 3.0) / 3.0
+        g = torch.where(x == 0, torch.zeros_like(g), torch.clamp(g, max=1e4))
+        return grad * g
+
+
 def rgb_to_oklab(rgb: torch.Tensor) -> torch.Tensor:
     m1 = torch.tensor(
         [
@@ -22,7 +39,7 @@ def rgb_to_oklab(rgb: torch.Tensor) -> torch.Tensor:
         device=rgb.device,
     )
     lms = rgb @ m1.T
-    return (torch.sign(lms) * torch.abs(lms).pow(1.0 / 3.0)) @ m2.T
+    return _SafeCbrt.apply(lms) @ m2.T
 
 
 def quantile_loss(graded: torch.Tensor, reference: torch.Tensor, levels: int = 64) -> torch.Tensor:
@@ -34,6 +51,12 @@ def moment_loss(graded: torch.Tensor, reference: torch.Tensor) -> torch.Tensor:
     mean_term = torch.mean(torch.abs(graded.mean(dim=0) - reference.mean(dim=0)))
     std_term = torch.mean(torch.abs(graded.std(dim=0) - reference.std(dim=0)))
     return mean_term + std_term
+
+
+def covariance_loss(graded: torch.Tensor, reference: torch.Tensor) -> torch.Tensor:
+    gc = graded - graded.mean(dim=0)
+    rc = reference - reference.mean(dim=0)
+    return torch.mean(torch.abs((gc.T @ gc) / gc.shape[0] - (rc.T @ rc) / rc.shape[0]))
 
 
 def tv_loss(volume: torch.Tensor) -> torch.Tensor:
