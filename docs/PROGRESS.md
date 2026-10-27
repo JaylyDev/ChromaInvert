@@ -11,7 +11,15 @@ Decisions locked:
 - Vertical slice first: .cube round trip, identity forward pass, benchmark recovery, then GUI wiring.
 
 Next steps:
-- Answer the 5 kickoff questions in Section 18 of the plan (duration, team size, demo footage format, demo GPU, Qt vs ImGui).
-- Scaffold repo skeleton per Section 12.3 (engine/, app/, assets/, scripts/, work/).
-- Implement .cube writer plus FFmpeg lut3d round trip test.
-- Smoke test Premiere Pro MCP on the demo machine or fall back to manual checklist.
+- Feature 2: DifferentiableLUT3D identity forward pass (`engine/chromainvert/lut_module.py` plus test).
+
+## 2026-10-27: Feature 1, .cube read/write engine
+
+Completed:
+- Added `engine/chromainvert/cube.py` with `CubeLut`, `identity_lattice`, `write_cube`, `read_cube`. Red varies fastest in file order, matching FFmpeg `lut3d` expectations. Writer clamps to [0, 1].
+- Added `engine/tests/test_cube_roundtrip.py`, `scripts/validate_cube.py`, plus project skeleton (`README.md`, `.gitignore`, `engine/pyproject.toml`, `assets/SOURCES.md`).
+
+Verified:
+- `python -m pytest engine/tests -q`: 5 passed (round trip at sizes 2, 17, 33, axis order, domain, rejection of bad files, writer validation).
+- `python scripts/validate_cube.py`: PASS. Identity 33 LUT applied with FFmpeg `lut3d` gives pixel-identical output (peak diff 0.0). Channel-swap LUT turns pure red into blue, confirming lattice axis order matches FFmpeg.
+
