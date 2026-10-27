@@ -1,5 +1,16 @@
 # ChromaInvert Progress Log
 
+## 2026-10-27: CI, GitHub Actions test workflow
+
+Completed:
+- Added `.github/workflows/tests.yml`: checkout, setup-python 3.11 with pip cache, install `./engine[dev]`, run `python -m pytest engine/tests -q` on push and pull request. Pins `actions/checkout@v7` and `actions/setup-python@v7` (Node 24 runtime).
+- Recorded the workflow under Parts of the project in `AGENTS.md`.
+- Council review (Muse Wonder) before this commit requested Node 24 action majors instead of v4/v5; verified the current latest is v7 and applied it with explicit `cache-dependency-path` and a quoted extra.
+
+Verified:
+- `python -m pytest engine/tests -q`: 46 passed.
+- Workflow YAML parses with `yaml.safe_load`.
+
 ## 2026-10-27: Hackathon plan drafted
 
 Completed:
