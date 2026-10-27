@@ -11,7 +11,16 @@ Decisions locked:
 - Vertical slice first: .cube round trip, identity forward pass, benchmark recovery, then GUI wiring.
 
 Next steps:
-- Feature 2: DifferentiableLUT3D identity forward pass (`engine/chromainvert/lut_module.py` plus test).
+- Feature 3: distribution-loss optimizer on the synthetic benchmark (CLI only).
+
+## 2026-10-27: Feature 2, DifferentiableLUT3D identity module
+
+Completed:
+- Added `engine/chromainvert/lut_module.py` with `DifferentiableLUT3D`: learnable `(1, 3, N, N, N)` volume sampled with `F.grid_sample` trilinear, identity initialization, `lattice()` accessor returning `(N, N, N, 3)` in `.cube` file order.
+- Added `engine/tests/test_lut_identity.py`.
+
+Verified:
+- `python -m pytest engine/tests -q`: 8 passed. Identity forward reproduces a random image within 1e-5, corners are exact, gradients flow to the volume, and the module lattice round-trips through `.cube` export.
 
 ## 2026-10-27: Feature 1, .cube read/write engine
 
