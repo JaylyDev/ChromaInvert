@@ -8,23 +8,6 @@
 
 namespace fs = std::filesystem;
 
-namespace {
-std::string jsonEscape(const std::string& s) {
-    std::string out;
-    for (char c : s) {
-        switch (c) {
-            case '"': out += "\\\""; break;
-            case '\\': out += "\\\\"; break;
-            case '\n': out += "\\n"; break;
-            case '\r': out += "\\r"; break;
-            case '\t': out += "\\t"; break;
-            default: out += c; break;
-        }
-    }
-    return out;
-}
-}
-
 int main(int argc, char** argv) {
     std::string ver, err;
     if (!Ffmpeg::checkFfmpeg(ver, err)) { std::cerr << err << "\n"; return 1; }
@@ -47,27 +30,30 @@ int main(int argc, char** argv) {
         }
         for (auto& f : frames) std::cout << "frame: " << f << "\n";
 
+        fs::path absOut = fs::absolute(outDir);
+        for (auto& f : frames) f = fs::absolute(f).string();
+        fs::path absCube = absOut / "out.cube";
+        fs::path absReport = absOut / "report.json";
         std::string srcArr = "[";
         for (size_t i = 0; i < frames.size(); ++i) {
             if (i) srcArr += ",";
-            srcArr += "\"" + jsonEscape(frames[i]) + "\"";
+            srcArr += "\"" + JobRunner::jsonEscape(frames[i]) + "\"";
         }
         srcArr += "]";
         std::string refArr = "[]";
-        if (!JobRunner::writeJobJson(outDir + "/job.json", srcArr, refArr, outDir + "/out.cube", outDir + "/report.json", "rec709", 33, 17, 200, 1.0, 42)) {
+        if (!JobRunner::writeJobJson((absOut / "job.json").string(), srcArr, refArr, absCube.string(), absReport.string(), "rec709", 33, 17, 200, 1.0, 42)) {
             std::cerr << "failed to write job.json\n";
             return 1;
         }
-        std::cout << "wrote " << outDir << "/job.json\n";
+        std::cout << "wrote " << (absOut / "job.json").string() << "\n";
 
-        std::string cube = outDir + "/out.cube";
         std::error_code ec;
-        if (!fs::exists(cube, ec)) {
+        if (!fs::exists(absCube, ec)) {
             std::cout << "preview skipped: no cube yet (run the engine first)\n";
             return 0;
         }
         std::string preview, perr;
-        if (Preview::generatePreview(video, cube, outDir, preview, perr)) {
+        if (Preview::generatePreview(video, absCube.string(), absOut.string(), preview, perr)) {
             std::cout << "preview: " << preview << "\n";
         } else {
             std::cerr << "preview failed: " << perr << "\n";

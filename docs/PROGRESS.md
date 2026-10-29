@@ -1,5 +1,20 @@
 # ChromaInvert Progress Log
 
+## 2026-10-29: Review follow-up, Wonder re-review fixes on FFmpeg decode link (Issue #10)
+
+Completed:
+- Fixed lut3d path escaping in `scripts/ffmpeg_helpers.py` and `app/src/Ffmpeg.cpp`: replaced the broken quoted `\'` scheme with unquoted double-level escaping (`:` as `\\:`, `'` as `\\\'`, `,` `;` `[` `]` single-escaped), verified by brute force against FFmpeg 9. The old scheme dropped apostrophes (`lut's dir` became `luts dir`); the new scheme passes colon, space, apostrophe, comma, semicolon, and bracket paths in both the Python helper and the compiled C++ harness.
+- `app/src/main.cpp` now stores absolute frame, cube, report, and job paths in `job.json`, so the engine no longer resolves `work/work/src_0.png`. The shared `JobRunner::jsonEscape` replaces the duplicated helper in `main.cpp`.
+- `Ffmpeg::extractFrames` and `Preview::generatePreview` now create their output directories, so the exe works on a fresh cwd. Removed dead `JobRunner::childHandle`, added the missing trailing newline in `JobRunner.cpp`/`JobRunner.h`.
+- Minors: `ffmpeg_helpers probe` on a missing file prints one `error:` line with exit 1 instead of a traceback; `_pixel_format_error` no longer treats any `not supported` message as a pixel-format failure.
+
+Verified:
+- `python -m pytest engine/tests -q`: 46 passed.
+- `python scripts/validate_cube.py`: PASS.
+- Python `apply_lut_preview` and C++ `applyLutPreview` harness: PASS on plain, space, apostrophe, and `,;[]` cube paths; missing cube cleanly rejected.
+- `chromainvert_app.exe` no-args exits 0, missing file exits 1, fresh-temp-dir run creates `work/`, extracts 3 frames, writes absolute-path `job.json`; an absolute-path job runs the engine to `done` with a cube written.
+- CMake Release build green.
+
 ## 2026-10-27: CI, GitHub Actions test workflow
 
 Completed:

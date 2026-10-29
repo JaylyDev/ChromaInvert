@@ -43,8 +43,9 @@ std::string escapeLut3dPath(const std::string& p) {
     std::string s;
     for (char c : p) {
         if (c == '\\') s += '/';
-        else if (c == ':') s += "\\:";
-        else if (c == '\'') s += "\\'";
+        else if (c == ':') s += "\\\\:";
+        else if (c == '\'') s += "\\\\\\'";
+        else if (c == ',' || c == ';' || c == '[' || c == ']') { s += '\\'; s += c; }
         else s += c;
     }
     return s;
@@ -131,6 +132,9 @@ Ffmpeg::ProbeResult Ffmpeg::probeVideo(const std::string& path, std::string& err
 std::vector<std::string> Ffmpeg::extractFrames(const std::string& video, const std::string& outDir, int count, std::string& logCmd, std::string& errMsg) {
     std::vector<std::string> files;
     if (hasUnsafePathChars(video) || hasUnsafePathChars(outDir)) { errMsg = "unsafe characters in path"; return files; }
+    std::error_code dcEc;
+    fs::create_directories(outDir, dcEc);
+    if (dcEc) { errMsg = "failed to create output directory"; return files; }
     std::string perr;
     ProbeResult probe = probeVideo(video, perr);
     if (!perr.empty()) { errMsg = perr; return files; }
@@ -168,7 +172,7 @@ bool Ffmpeg::applyLutPreview(const std::string& srcVideo, const std::string& cub
         errMsg = "unsafe characters in path";
         return false;
     }
-    std::string filter = "lut3d=file='" + escapeLut3dPath(cubeFile) + "':interp=tetrahedral";
+    std::string filter = "lut3d=file=" + escapeLut3dPath(cubeFile) + ":interp=tetrahedral";
     std::ostringstream cmd;
     cmd << "ffmpeg -y -i " << shellQuote(srcVideo)
         << " -vf " << shellQuote(filter)

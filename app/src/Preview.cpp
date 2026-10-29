@@ -16,6 +16,9 @@ bool inputOk(const std::string& p) {
 bool Preview::generatePreview(const std::string& srcVideo, const std::string& cubeFile, const std::string& workDir, std::string& outPreviewVideo, std::string& errMsg) {
     if (!inputOk(srcVideo)) { errMsg = "source video missing"; return false; }
     if (!inputOk(cubeFile)) { errMsg = "cube file missing"; return false; }
+    std::error_code dcEc;
+    fs::create_directories(workDir, dcEc);
+    if (dcEc) { errMsg = "failed to create output directory"; return false; }
     std::string preview = workDir + "/graded.mp4";
     std::string logCmd;
     if (!Ffmpeg::applyLutPreview(srcVideo, cubeFile, preview, logCmd, errMsg)) return false;

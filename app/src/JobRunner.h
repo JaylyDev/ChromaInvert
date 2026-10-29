@@ -19,6 +19,5 @@ public:
 
     static void cancel();
 
-private:
-    static void* childHandle;
+    static std::string jsonEscape(const std::string& s);
 };

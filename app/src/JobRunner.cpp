@@ -17,21 +17,6 @@ std::string quotePath(const std::string& s) {
     return out;
 }
 
-std::string jsonEscape(const std::string& s) {
-    std::string out;
-    for (char c : s) {
-        switch (c) {
-            case '"': out += "\\\""; break;
-            case '\\': out += "\\\\"; break;
-            case '\n': out += "\\n"; break;
-            case '\r': out += "\\r"; break;
-            case '\t': out += "\\t"; break;
-            default: out += c; break;
-        }
-    }
-    return out;
-}
-
 std::string readTail(const std::string& path, size_t maxChars) {
     std::ifstream f(path, std::ios::binary | std::ios::ate);
     if (!f.is_open()) return "";
@@ -45,7 +30,20 @@ std::string readTail(const std::string& path, size_t maxChars) {
 }
 }
 
-void* JobRunner::childHandle = nullptr;
+std::string JobRunner::jsonEscape(const std::string& s) {
+    std::string out;
+    for (char c : s) {
+        switch (c) {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default: out += c; break;
+        }
+    }
+    return out;
+}
 
 bool JobRunner::writeJobJson(const std::string& path, const std::string& sourceFramesJsonArray, const std::string& refFramesJsonArray, const std::string& outCube, const std::string& reportJson, const std::string& inputProfile, int lutSize, int coarseSize, int iterations, double strength, int seed, int fineIterations, const std::string& device) {
     std::ofstream f(path);
