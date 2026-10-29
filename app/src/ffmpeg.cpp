@@ -1,6 +1,7 @@
 #include "ffmpeg.h"
 
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -35,10 +36,14 @@ std::string lower_extension(const std::string& path) {
 std::string filter_escape(const std::string& path) {
   std::string out = "'";
   for (char c : path) {
-    if (c == '\\' || c == ':' || c == '\'') {
-      out += '\\';
+    if (c == '\'') {
+      out += "'\\''";
+    } else {
+      if (c == '\\' || c == ':') {
+        out += '\\';
+      }
+      out += c;
     }
-    out += c;
   }
   out += "'";
   return out;
@@ -78,7 +83,13 @@ bool probe_duration(const std::string& ffprobe, const std::string& video, double
   }
   char* end = nullptr;
   double parsed = std::strtod(buffer, &end);
-  if (end == buffer || parsed <= 0.0) {
+  if (end == buffer || !std::isfinite(parsed) || parsed <= 0.0) {
+    return false;
+  }
+  while (*end != '\0' && std::isspace(static_cast<unsigned char>(*end))) {
+    ++end;
+  }
+  if (*end != '\0') {
     return false;
   }
   seconds = parsed;
@@ -88,6 +99,8 @@ bool probe_duration(const std::string& ffprobe, const std::string& video, double
 int extract_frame(const std::string& ffmpeg, const std::string& video, double at_seconds, const std::string& out_png) {
   char seek[32];
   std::snprintf(seek, sizeof(seek), "%.3f", at_seconds);
+  std::error_code stale_error;
+  std::filesystem::remove(out_png, stale_error);
   std::string cmd = quote_arg(ffmpeg) + " -y -loglevel error -ss " + seek + " -i " + quote_arg(video) +
                     " -frames:v 1 " + quote_arg(out_png);
   int status = run_logged(cmd);
@@ -106,6 +119,10 @@ int extract_frame(const std::string& ffmpeg, const std::string& video, double at
 }
 
 int apply_lut(const std::string& ffmpeg, const std::string& input, const std::string& cube, const std::string& output) {
+  if (cube.find('\'') != std::string::npos) {
+    std::fprintf(stderr, "error: cube path must not contain a single quote (ffmpeg lut3d cannot parse it)\n");
+    return 1;
+  }
   std::string cmd = quote_arg(ffmpeg) + " -y -loglevel error -i " + quote_arg(input) + " -vf \"lut3d=file=" +
                     filter_escape(cube) + "\"";
   std::string ext = lower_extension(output);

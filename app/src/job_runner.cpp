@@ -256,7 +256,7 @@ int write_job_json(const std::string& path, const RunOptions& opts) {
 
 EngineResult run_engine(const RunOptions& opts, const std::string& job_path) {
   EngineResult result;
-  std::string cmd = quote_arg(opts.python) + " -m chromainvert run " + quote_arg(job_path) + " 2>&1";
+  std::string cmd = quote_arg(opts.python) + " -m chromainvert.cli run " + quote_arg(job_path) + " 2>&1";
   std::printf("run: %s\n", cmd.c_str());
   std::fflush(stdout);
   FILE* pipe = POPEN(shell_command(cmd).c_str(), "r");

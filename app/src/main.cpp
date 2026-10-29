@@ -243,6 +243,10 @@ int cmd_run(CliOptions& opts) {
     std::fprintf(stderr, "error: --job-file, --output-cube, and --report-json must be plain file names\n");
     return 1;
   }
+  if (opts.run.output_cube.find('\'') != std::string::npos) {
+    std::fprintf(stderr, "error: --output-cube must not contain a single quote (ffmpeg lut3d cannot parse it)\n");
+    return 1;
+  }
   if (opts.run.strength < 0.0 || opts.run.strength > 1.0) {
     std::fprintf(stderr, "error: strength must be in [0, 1]\n");
     return 1;
@@ -252,7 +256,7 @@ int cmd_run(CliOptions& opts) {
     return 1;
   }
   if (opts.run.iterations < 0 || opts.run.fine_iterations < 0 ||
-      opts.run.iterations + opts.run.fine_iterations == 0) {
+      (opts.run.iterations == 0 && opts.run.fine_iterations == 0)) {
     std::fprintf(stderr, "error: iteration counts must be non-negative with a positive total\n");
     return 1;
   }
@@ -264,7 +268,9 @@ int cmd_run(CliOptions& opts) {
   }
   std::vector<std::string> shell_args = {opts.source_video,        opts.reference, opts.preview_out,
                                          opts.ffmpeg,              opts.ffprobe,   opts.run.workdir,
-                                         opts.run.python,          opts.run.device, opts.run.input_profile};
+                                         opts.run.python,          opts.run.device, opts.run.input_profile,
+                                         opts.run.job_file,        opts.run.output_cube,
+                                         opts.run.report_json};
   shell_args.insert(shell_args.end(), opts.run.source_frames.begin(), opts.run.source_frames.end());
   shell_args.insert(shell_args.end(), opts.run.reference_frames.begin(), opts.run.reference_frames.end());
   for (const std::string& arg : shell_args) {
