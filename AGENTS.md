@@ -20,6 +20,8 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `app/`: C++ desktop host skeleton (FFmpeg pipeline, preview UI). Not yet implemented.
 - `scripts/validate_cube.py`: FFmpeg `lut3d` acceptance check for exported cubes.
 - `scripts/run_benchmark.py`: runs the synthetic benchmark and writes `work/benchmark.json`.
+- `scripts/run_demo.py`: demo dry run; extracts frames with FFmpeg, writes `work/demo/job.json`, runs the engine, grades a preview clip with `lut3d`, runs the synthetic benchmark, prints a timing table.
+- `docs/DEMO_SCRIPT.md`: 3 minute run-of-show with commands, timings, and failure lines.
 - `docs/CHROMAINVERT_HACKATHON_PLAN.md`: full technical plan and team guide.
 - `docs/ARCHITECTURE.md`: engine contract v1 (`job.json` schema, stdout JSONL protocol, `report.json` fields, color pipeline).
 - `docs/PROGRESS.md`: timestamped build log, updated with every feature.
