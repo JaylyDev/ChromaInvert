@@ -76,3 +76,16 @@ Verified:
 - `python -m pytest engine/tests -q`: 55 passed.
 - Deterministic GPU mode uses `torch.use_deterministic_algorithms(True, warn_only=True)` because the 3D LUT `grid_sample` backward has no deterministic CUDA kernel; cuDNN benchmarking disabled.
 
+## 2026-10-29: Review, deterministic GPU followup and probe gate cleanup
+
+Completed:
+- Removed duplicate and placeholder tests in `engine/tests/test_deterministic_heldout.py`; kept six focused tests for probe determinism, gate failure on identity, config default, CPU deterministic status, and benchmark probe keys.
+- Simplified `cmd_benchmark` in `engine/chromainvert/cli.py` to use direct argparse attributes.
+- Updated `AGENTS.md` Parts of the project for the `deterministic` flag in `optimize.py` and the probe heldout gate in `benchmark.py`.
+
+Verified:
+- `python -m pytest engine/tests -q`: 52 passed.
+- `python scripts/validate_cube.py`: PASS.
+- Rec709 SampleFootage smoke test: extracted 320x180 PNG frames with FFmpeg, ran `chromainvert run` with `deterministic: true` on CPU, report records `deterministic: true` with variance note and exports a valid cube.
+- Synthetic probe smoke test on CPU: probe gate reports baseline and recovered DeltaE with `heldout_gate_pass`, `probe_count`, and `probe_seed` in `work/benchmark.json`.
+

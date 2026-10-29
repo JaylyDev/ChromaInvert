@@ -99,9 +99,9 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
         seed=args.seed,
         device=args.device,
         pixel_budget=args.pixels,
-        deterministic=bool(getattr(args, "deterministic", False)),
-        probe_count=int(getattr(args, "probe_count", 10000)),
-        probe_seed=getattr(args, "probe_seed", None),
+        deterministic=args.deterministic,
+        probe_count=args.probe_count,
+        probe_seed=args.probe_seed,
     )
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

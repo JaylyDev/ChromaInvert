@@ -78,22 +78,3 @@ def test_run_benchmark_includes_probe_keys():
     assert metrics["probe_count"] == 64
     assert metrics["heldout_gate_threshold"] == 0.4
     assert isinstance(metrics["heldout_gate_pass"], bool)
-
-
-def test_random_rgb_probe_deterministic():
-    a = random_rgb_probe(10, seed=7)
-    b = random_rgb_probe(10, seed=7)
-    np.testing.assert_array_equal(a, b)
-
-
-def test_heldout_gate():
-    # Placeholder logic; expanded once benchmark.py held-out probe lands.
-    improvement = 0.0
-    recovered = 5.0
-    gate_pass = bool(improvement >= 0.4 or recovered < 3.0)
-    assert gate_pass is False
-
-
-def test_optimize_config_deterministic():
-    cfg = OptimizeConfig(deterministic=True)
-    assert cfg.deterministic is True
