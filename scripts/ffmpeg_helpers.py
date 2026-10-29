@@ -152,7 +152,9 @@ def _output_ok(path: str) -> bool:
 
 def _pixel_format_error(stderr: str) -> bool:
     lowered = (stderr or "").lower()
-    return "pix_fmt" in lowered or "pixel format" in lowered or "not supported" in lowered
+    if "pix_fmt" in lowered or "pixel format" in lowered:
+        return True
+    return ("pixel" in lowered or "format" in lowered) and "not supported" in lowered
 
 
 def _check_output(path: str, stderr: str = "") -> None:
@@ -162,8 +164,17 @@ def _check_output(path: str, stderr: str = "") -> None:
 
 def _escape_lut3d_path(path: str) -> str:
     s = str(path).replace("\\", "/")
-    s = s.replace("'", "\\'")
-    return s.replace(":", "\\:")
+    parts: list[str] = []
+    for c in s:
+        if c == ":":
+            parts.append("\\\\:")
+        elif c == "'":
+            parts.append("\\\\\\'")
+        elif c in (",", ";", "[", "]"):
+            parts.append("\\" + c)
+        else:
+            parts.append(c)
+    return "".join(parts)
 
 
 def extract_frames(video: str, out_dir: str, count: int = 5, prefix: str = "src") -> list[str]:
@@ -206,7 +217,7 @@ def extract_thumbnails(video: str, out_dir: str) -> list[str]:
 
 def apply_lut_preview(src_video: str, cube_path: str, out_video: str) -> dict:
     cmd = [
-        "ffmpeg", "-y", "-i", src_video, "-vf", f"lut3d=file='{_escape_lut3d_path(cube_path)}':interp=tetrahedral",
+        "ffmpeg", "-y", "-i", src_video, "-vf", f"lut3d=file={_escape_lut3d_path(cube_path)}:interp=tetrahedral",
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-colorspace", "bt709",
         "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv",
         "-movflags", "+faststart", out_video,
@@ -429,7 +440,11 @@ def main() -> int:
         print(json.dumps(info, indent=2) if getattr(args, "json", False) else info)
         return 0
     if args.command == "probe":
-        probe = probe_video(args.video)
+        try:
+            probe = probe_video(args.video)
+        except RuntimeError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
         print(json.dumps(probe, indent=2) if getattr(args, "json", False) else format_probe_human(probe))
         return 0
     if args.command == "extract":
