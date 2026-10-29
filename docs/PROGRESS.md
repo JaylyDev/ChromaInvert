@@ -13,6 +13,18 @@ Verified:
 - `python scripts/validate_cube.py`: PASS.
 - Real S-Log3 footage (`Slog3 -proress 444.mov` frame via FFmpeg `gbrp16le` TIFF): unbounded decode peaked at 2.39 linear, bounded working space decodes to [0.02, 0.99]; end-to-end `slog3` job (contract 2) emits progress and done events plus `out.cube` and `report.json`.
 
+## 2026-10-29: Apple Log input profile support
+
+Completed:
+- Added Apple Log decode to `engine/chromainvert/color.py`: `encode_apple_log` and `decode_apple_log` implement the Apple Log Profile piecewise OETF with constants R0 -0.05641088, Rt 0.01, c 47.28711236, beta 0.00964052, gamma 0.08550479, delta 0.69336945; `rec2020_to_rec709_linear` converts Rec.2020 primaries to Rec.709 linear; `decode_input` accepts `apple_log` and returns clipped `[0, 1]` SDR working values.
+- Accepted `apple_log` in `engine/chromainvert/cli.py` (`rec709` and `apple_log` allowed; `slog3` still rejected); documented the profile in `docs/ARCHITECTURE.md` (job schema row and color pipeline).
+- Added unit tests: Apple Log known values (18 percent gray encodes to 0.48827), encode/decode roundtrip, Rec.2020 to Rec.709 white/black preservation, bounded `decode_input` output, and a CLI acceptance test asserting `cmd_run` succeeds with `input_profile apple_log` and records it in the report.
+
+Verified:
+- `python -m pytest engine/tests -q`: 51 passed.
+- `python scripts/validate_cube.py`: PASS.
+- Real footage: Apple Log sample (`A001_10290006_C100.mov`, ffprobe confirms `bt2020` primaries with unknown transfer) decodes to working means about (0.40, 0.33, 0.17) with 9.7 percent of highlights above 1.0 clipped to the bounded range; a 2-iteration CPU CLI run on a downscaled frame emits progress, `done`, and a report with `input_profile apple_log`.
+
 ## 2026-10-29: Demo script and dry run
 
 Completed:
@@ -69,6 +81,7 @@ Next steps:
 - `python scripts/premiere_validation.py` on synthetic chart: PASS (python vs trilinear mean 0.232; tetrahedral gap mean 0.008, max 1.973).
 - Same script on Rec.709 SampleFootage frame (`A001_10290006_C101.mov` at 1s): PASS (python vs trilinear mean 0.258; tetrahedral gap mean 0.015, max 1.897).
 - Identity cube plus FFmpeg tetrahedral output as `--premiere-still`: PASS (premiere pair mean 0.000).
+
 
 ## 2026-10-27: CI, GitHub Actions test workflow
 

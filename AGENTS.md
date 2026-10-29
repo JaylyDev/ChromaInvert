@@ -10,7 +10,7 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 
 - `engine/chromainvert/cube.py`: `.cube` read/write, lattice reshape and validation. Red varies fastest in file order, matching FFmpeg `lut3d` expectations.
 - `engine/chromainvert/lut_module.py`: `DifferentiableLUT3D`, the learnable `(1, 3, N, N, N)` volume sampled with `F.grid_sample`.
-- `engine/chromainvert/color.py`: sRGB transfers, Oklab and CIE Lab conversion, DeltaE2000, Sony S-Log3 decode, `decode_input` for the `rec709` and `slog3` profiles.
+- `engine/chromainvert/color.py`: sRGB transfers, Oklab and CIE Lab conversion, DeltaE2000, Sony S-Log3 and Apple Log decode, `decode_input` for the `rec709`, `slog3`, and `apple_log` profiles.
 - `engine/chromainvert/losses.py`: quantile and moment distribution matching, covariance matching, TV smoothness, identity prior, skin and shadow anchors, gamut penalty.
 - `engine/chromainvert/masks.py`: YCbCr skin heuristic and luminance shadow masks.
 - `engine/chromainvert/spline.py`: separable Catmull-Rom upsampling for coarse-to-fine lattices.

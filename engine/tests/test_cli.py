@@ -139,3 +139,13 @@ def test_run_rejects_bad_contract_version(tmp_path):
         args = argparse.Namespace(job=str(write_job(tmp_path, contract_version=bad)))
         with pytest.raises(ValueError):
             cmd_run(args)
+
+
+def test_run_accepts_apple_log(tmp_path):
+    import argparse
+
+    args = argparse.Namespace(job=str(write_job(tmp_path, input_profile="apple_log")))
+    assert cmd_run(args) == 0
+    assert (tmp_path / "out.cube").exists()
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert report["input_profile"] == "apple_log"

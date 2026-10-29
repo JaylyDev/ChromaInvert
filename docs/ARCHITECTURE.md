@@ -14,14 +14,14 @@ app --reads--> work/out.cube --applies--> FFmpeg lut3d preview and encode
 
 ## job.json (contract_version 2)
 
-Contract v2 is backwards compatible with v1; v1 jobs with `input_profile: rec709` still run when `contract_version` is 1 or 2. V2 adds bounded S-Log3 working-space support.
+Contract v2 is backwards compatible with v1; v1 jobs with `input_profile: rec709` or `apple_log` still run when `contract_version` is 1 or 2. V2 adds bounded S-Log3 working-space support.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `contract_version` | int | required, must be 1 or 2 | schema version; 1 supported rec709 only, 2 adds slog3 profiles with bounded working space |
+| `contract_version` | int | required, must be 1 or 2 | schema version; 1 supports rec709 and apple_log, 2 adds slog3 profiles with bounded working space |
 | `source_frames` | list[str] | required | ungraded frames, 16-bit TIFF preferred (the imageio/Pillow reader downconverts 16-bit PNG to 8-bit, so use TIFF to keep precision) |
 | `reference_frames` | list[str] | required | reference grade frames |
-| `input_profile` | str | `rec709` | frame decoding; `rec709` for display-referred Rec.709/sRGB, `slog3` or `slog3_sgamut3cine` for Sony S-Log3/S-Gamut3.Cine with bounded working-space transform |
+| `input_profile` | str | `rec709` | frame decoding; `rec709` for display-referred Rec.709/sRGB, `apple_log` for Apple Log (Rec.2020) to bounded SDR working space, `slog3` or `slog3_sgamut3cine` for Sony S-Log3/S-Gamut3.Cine with bounded working-space transform |
 | `coarse_size` | int | 17 | coarse optimization lattice |
 | `lut_size` | int | 33 | exported lattice size |
 | `iterations` | int | 400 | coarse Adam iterations |
@@ -68,6 +68,8 @@ Full-range versus limited-range: the engine assumes full-range code values where
 
 `rec709`: `decode_input` applies `srgb_to_linear` (Rec.709/sRGB OETF inverse) to obtain display-referred linear light in `[0, 1]`. This path is unchanged from v1.
 
+`apple_log`: `decode_input` applies the Apple Log inverse OETF (`decode_apple_log` with the Apple Log Profile constants) to obtain linear Rec.2020, converts to linear Rec.709 via `rec2020_to_rec709_linear`, and clips to `[0, 1]` for a bounded SDR working space. Available under contract v1 and v2. The selected profile applies to both source and reference frames.
+
 `slog3` and `slog3_sgamut3cine`: `decode_input` performs the bounded S-Log3 working-space transform defined in `engine/chromainvert/color.py`:
 
 1. S-Log3 decode: Sony published curve from code in `[0, 1]` (0 to 1023 CV) to scene-referred linear reflection. Middle gray 0.18 maps to 420/1023 code, 0.9 reflectance to 598/1023, and 1.0 code to about 38.4 linear. Values below the knee (code < 171.21/1023) use the linear toe.
@@ -96,4 +98,4 @@ The recovered lattice is blended by `strength` toward identity, clamped to `[0, 
 
 ### 5. Preview
 
-FFmpeg `lut3d` applies the same file for preview and export, so the in-app result matches DaVinci Resolve and Premiere Pro by construction. For S-Log3 sources the preview pipeline is: decode S-Log3 to bounded working space, apply `out.cube`, display as Rec.709. No additional inverse is needed because the LUT was optimized in that bounded domain.
+FFmpeg `lut3d` applies the same file for preview and export, so the in-app result matches DaVinci Resolve and Premiere Pro by construction. For S-Log3 sources the preview pipeline is: decode S-Log3 to bounded working space, apply `out.cube`, display as Rec.709. For Apple Log sources: decode Apple Log to bounded SDR working space, apply `out.cube`, display as Rec.709. No additional inverse is needed because the LUT was optimized in that bounded domain.

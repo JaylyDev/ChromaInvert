@@ -48,6 +48,23 @@ _SGAMUT3CINE_TO_REC709 = _XYZ_TO_SRGB @ _SGAMUT3CINE_TO_XYZ
 _SLOG_WORKING_THRESHOLD = 0.9
 _SLOG_WORKING_SHOULDER = 0.15
 
+# Apple Log Profile specification constants.
+_APPLE_R0 = -0.05641088
+_APPLE_RT = 0.01
+_APPLE_C = 47.28711236
+_APPLE_BETA = 0.00964052
+_APPLE_GAMMA = 0.08550479
+_APPLE_DELTA = 0.69336945
+_APPLE_PT = _APPLE_C * (_APPLE_RT - _APPLE_R0) ** 2
+
+_BT2020_TO_SRGB_LINEAR = np.array(
+    [
+        [1.6604910021, -0.5876411388, -0.0728498633],
+        [-0.1245504745, 1.1328998971, -0.0083494226],
+        [-0.0181507634, -0.1005788980, 1.1187296614],
+    ]
+)
+
 
 def srgb_to_linear(c: NDArray[np.floating]) -> NDArray[np.float64]:
     c = np.asarray(c, dtype=np.float64)
@@ -186,9 +203,31 @@ def slog3_to_working_space(code: NDArray[np.floating]) -> NDArray[np.float64]:
     return linear_to_bounded(rec709_linear)
 
 
+def encode_apple_log(reflection: NDArray[np.floating]) -> NDArray[np.float64]:
+    x = np.asarray(reflection, dtype=np.float64)
+    quad = _APPLE_C * (x - _APPLE_R0) ** 2
+    with np.errstate(invalid="ignore", divide="ignore"):
+        log = _APPLE_GAMMA * np.log2(x + _APPLE_BETA) + _APPLE_DELTA
+    return np.where(x < _APPLE_R0, 0.0, np.where(x < _APPLE_RT, quad, log))
+
+
+def decode_apple_log(code: NDArray[np.floating]) -> NDArray[np.float64]:
+    y = np.asarray(code, dtype=np.float64)
+    quad = np.sqrt(np.maximum(y, 0.0) / _APPLE_C) + _APPLE_R0
+    log = 2.0 ** ((y - _APPLE_DELTA) / _APPLE_GAMMA) - _APPLE_BETA
+    return np.where(y < 0.0, _APPLE_R0, np.where(y < _APPLE_PT, quad, log))
+
+
+def rec2020_to_rec709_linear(rgb: NDArray[np.floating]) -> NDArray[np.float64]:
+    return np.asarray(rgb, dtype=np.float64) @ _BT2020_TO_SRGB_LINEAR.T
+
+
 def decode_input(pixels: NDArray[np.floating], profile: str) -> NDArray[np.float64]:
     if profile == "rec709":
         return srgb_to_linear(pixels)
     if profile in ("slog3", "slog3_sgamut3cine", "slog3_sgamut3.cine", "slog3_sgamut3_cine"):
         return slog3_to_working_space(pixels)
+    if profile == "apple_log":
+        linear2020 = decode_apple_log(pixels)
+        return np.clip(rec2020_to_rec709_linear(linear2020), 0.0, 1.0)
     raise ValueError(f"unknown input profile: {profile}")

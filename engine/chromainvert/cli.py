@@ -12,7 +12,7 @@ from chromainvert.color import decode_input
 from chromainvert.cube import CubeLut, identity_lattice, write_cube
 from chromainvert.optimize import OptimizeConfig, optimize_lut
 
-_ALLOWED_PROFILES = {"rec709", "slog3", "slog3_sgamut3cine", "slog3_sgamut3.cine", "slog3_sgamut3_cine"}
+_ALLOWED_PROFILES = {"rec709", "apple_log", "slog3", "slog3_sgamut3cine", "slog3_sgamut3.cine", "slog3_sgamut3_cine"}
 
 
 def resolve(base: Path, p: str) -> Path:
@@ -68,7 +68,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     profile = str(job.get("input_profile", "rec709"))
     if profile not in _ALLOWED_PROFILES:
         raise ValueError(f"unsupported input_profile {profile!r}, expected one of {sorted(_ALLOWED_PROFILES)}")
-    if contract_version == 1 and profile != "rec709":
+    if contract_version == 1 and profile not in ("rec709", "apple_log"):
         raise ValueError(f"input_profile {profile!r} requires contract_version 2")
     strength = float(job.get("strength", 1.0))
     if not 0.0 <= strength <= 1.0:
