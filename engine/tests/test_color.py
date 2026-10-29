@@ -72,13 +72,22 @@ def test_apple_log_known_values():
 
 
 def test_apple_log_roundtrip():
-    x = np.linspace(0.011, 1.0, 50)
+    x = np.linspace(-0.05, 1.0, 50)
     np.testing.assert_allclose(decode_apple_log(encode_apple_log(x)), x, rtol=1e-9)
+
+
+def test_apple_log_below_r0_clamps():
+    np.testing.assert_allclose(encode_apple_log(np.array([-0.1])), [0.0], atol=0.0)
 
 
 def test_apple_log_primaries_to_rec709():
     np.testing.assert_allclose(rec2020_to_rec709_linear(np.ones((1, 3))), [[1.0, 1.0, 1.0]], atol=1e-9)
     np.testing.assert_allclose(rec2020_to_rec709_linear(np.zeros((1, 3))), [[0.0, 0.0, 0.0]], atol=1e-12)
+    np.testing.assert_allclose(
+        rec2020_to_rec709_linear(np.eye(3)),
+        [[1.660491, -0.12455, -0.018151], [-0.587641, 1.1329, -0.100579], [-0.07285, -0.008349, 1.11873]],
+        atol=1e-6,
+    )
 
 
 def test_decode_input_apple_log_bounded():
