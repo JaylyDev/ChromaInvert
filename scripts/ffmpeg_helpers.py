@@ -58,23 +58,23 @@ def check_python_env() -> dict:
     }
 
 
-def _run_ffprobe(path: str) -> dict:
+def _run_ffprobe(path: str, timeout: int = 30) -> dict:
     cmd = [
         "ffprobe", "-v", "error", "-select_streams", "v:0",
         "-show_entries", "stream=codec_name,width,height,avg_frame_rate,r_frame_rate,duration,pix_fmt,color_primaries,color_transfer,color_space,color_range,bits_per_raw_sample",
         "-show_entries", "format=duration", "-of", "json", path,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or "ffprobe failed")
     try:
         return json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return {}
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"ffprobe returned invalid JSON: {exc}") from exc
 
 
 def _parse_fps(frac: str) -> str:
-    if not frac or frac == "N/A":
+    if not frac or frac in ("N/A", "unknown"):
         return "unknown"
     if "/" in frac:
         num, den = frac.split("/", 1)
@@ -103,14 +103,20 @@ def probe_video(path: str) -> dict:
     streams = raw.get("streams", []) or []
     s = streams[0] if streams else {}
     fmt = raw.get("format", {}) or {}
-    duration = s.get("duration") or fmt.get("duration")
-    fps_raw = s.get("avg_frame_rate") or s.get("r_frame_rate") or "unknown"
+    duration_raw = s.get("duration") or fmt.get("duration")
+    try:
+        duration = float(duration_raw) if duration_raw not in (None, "N/A") else "unknown"
+    except (TypeError, ValueError):
+        duration = "unknown"
+    fps = _parse_fps(s.get("avg_frame_rate") or "")
+    if fps == "unknown":
+        fps = _parse_fps(s.get("r_frame_rate") or "")
     return {
         "codec": s.get("codec_name") or "unknown",
         "width": s.get("width") or "unknown",
         "height": s.get("height") or "unknown",
-        "fps": _parse_fps(fps_raw),
-        "duration": float(duration) if duration not in (None, "N/A") else "unknown",
+        "fps": fps,
+        "duration": duration,
         "pix_fmt": s.get("pix_fmt") or "unknown",
         "primaries": s.get("color_primaries") or "unknown",
         "transfer": s.get("color_transfer") or "unknown",
@@ -140,6 +146,26 @@ def format_probe_human(probe: dict) -> str:
     )
 
 
+def _output_ok(path: str) -> bool:
+    return os.path.exists(path) and os.path.getsize(path) > 0
+
+
+def _pixel_format_error(stderr: str) -> bool:
+    lowered = (stderr or "").lower()
+    return "pix_fmt" in lowered or "pixel format" in lowered or "not supported" in lowered
+
+
+def _check_output(path: str, stderr: str = "") -> None:
+    if not _output_ok(path):
+        raise RuntimeError(f"ffmpeg produced no output at {path}: {(stderr or '')[-500:]}")
+
+
+def _escape_lut3d_path(path: str) -> str:
+    s = str(path).replace("\\", "/")
+    s = s.replace("'", "\\'")
+    return s.replace(":", "\\:")
+
+
 def extract_frames(video: str, out_dir: str, count: int = 5, prefix: str = "src") -> list[str]:
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg is None:
@@ -159,11 +185,17 @@ def extract_frames(video: str, out_dir: str, count: int = 5, prefix: str = "src"
         cmd16 = ["ffmpeg", "-y", "-ss", str(round(t, 3)), "-i", video, "-frames:v", "1", "-pix_fmt", "rgb48be", str(out_path)]
         print(" ".join(cmd16))
         r = subprocess.run(cmd16, capture_output=True, text=True)
-        if r.returncode != 0:
-            print("16-bit PNG not supported, falling back to 8-bit")
-            cmd8 = ["ffmpeg", "-y", "-ss", str(round(t, 3)), "-i", video, "-frames:v", "1", str(out_path)]
+        if r.returncode != 0 or not _output_ok(str(out_path)):
+            err = (r.stderr or "")
+            if r.returncode != 0 and not _pixel_format_error(err):
+                raise RuntimeError(f"frame extraction failed: {err[-500:]}")
+            print("16-bit extraction failed, falling back to 8-bit")
+            cmd8 = ["ffmpeg", "-y", "-ss", str(round(t, 3)), "-i", video, "-frames:v", "1", "-pix_fmt", "rgb24", str(out_path)]
             print(" ".join(cmd8))
-            subprocess.run(cmd8, check=True, capture_output=True)
+            r8 = subprocess.run(cmd8, capture_output=True, text=True)
+            if r8.returncode != 0:
+                raise RuntimeError(f"8-bit fallback failed: {(r8.stderr or '')[-500:]}")
+        _check_output(str(out_path), r.stderr if r.returncode == 0 else "")
         paths.append(str(out_path))
     return paths
 
@@ -174,24 +206,31 @@ def extract_thumbnails(video: str, out_dir: str) -> list[str]:
 
 def apply_lut_preview(src_video: str, cube_path: str, out_video: str) -> dict:
     cmd = [
-        "ffmpeg", "-y", "-i", src_video, "-vf", f"lut3d=file='{cube_path}':interp=tetrahedral",
+        "ffmpeg", "-y", "-i", src_video, "-vf", f"lut3d=file='{_escape_lut3d_path(cube_path)}':interp=tetrahedral",
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-colorspace", "bt709",
         "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv",
         "-movflags", "+faststart", out_video,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
-    return {"command": " ".join(cmd), "success": result.returncode == 0, "stderr": result.stderr}
+    ok = result.returncode == 0 and _output_ok(out_video)
+    return {"command": " ".join(cmd), "success": ok, "stderr": result.stderr}
 
 
 def grab_frame_at(video: str, timestamp: float, out_path: str) -> str:
     cmd16 = ["ffmpeg", "-y", "-ss", str(timestamp), "-i", video, "-frames:v", "1", "-pix_fmt", "rgb48be", out_path]
     print(" ".join(cmd16))
     r = subprocess.run(cmd16, capture_output=True, text=True)
-    if r.returncode != 0:
-        print("16-bit PNG not supported, falling back to 8-bit")
-        cmd8 = ["ffmpeg", "-y", "-ss", str(timestamp), "-i", video, "-frames:v", "1", out_path]
+    if r.returncode != 0 or not _output_ok(out_path):
+        err = (r.stderr or "")
+        if r.returncode != 0 and not _pixel_format_error(err):
+            raise RuntimeError(f"frame grab failed: {err[-500:]}")
+        print("16-bit extraction failed, falling back to 8-bit")
+        cmd8 = ["ffmpeg", "-y", "-ss", str(timestamp), "-i", video, "-frames:v", "1", "-pix_fmt", "rgb24", out_path]
         print(" ".join(cmd8))
-        subprocess.run(cmd8, check=True, capture_output=True)
+        r8 = subprocess.run(cmd8, capture_output=True, text=True)
+        if r8.returncode != 0:
+            raise RuntimeError(f"8-bit fallback failed: {(r8.stderr or '')[-500:]}")
+    _check_output(out_path, r.stderr if r.returncode == 0 else "")
     return out_path
 
 
@@ -208,7 +247,9 @@ def preview_before_after(src_video: str, cube_path: str, workdir: str, timestamp
     before: list[str] = []
     after: list[str] = []
     graded_video = str(out / "graded.mp4")
-    apply_lut_preview(src_video, cube_path, graded_video)
+    applied = apply_lut_preview(src_video, cube_path, graded_video)
+    if not applied["success"]:
+        raise RuntimeError(f"lut3d preview failed: {(applied['stderr'] or '')[-500:]}")
     for i, t in enumerate(timestamps):
         bp = str(out / f"before_{i:03d}.png")
         ap = str(out / f"after_{i:03d}.png")
@@ -257,6 +298,8 @@ class EngineRunner:
         self.process: Optional[subprocess.Popen] = None
         self.job_path: Optional[str] = None
         self.stderr_tail: str = ""
+        self._stderr_file = None
+        self._stderr_path: Optional[str] = None
 
     def start(self) -> None:
         job = dict(self.job_json)
@@ -270,11 +313,18 @@ class EngineRunner:
         with os.fdopen(fd, "w") as f:
             json.dump(job, f)
         assert self.job_path is not None
+        env = dict(os.environ)
+        engine_dir = str(ROOT / "engine")
+        existing = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = engine_dir + os.pathsep + existing if existing else engine_dir
+        self._stderr_file = tempfile.NamedTemporaryFile(mode="w", suffix=".chromainvert.stderr", delete=False)
+        self._stderr_path = self._stderr_file.name
         self.process = subprocess.Popen(
-            ["python", "-m", "chromainvert", "run", self.job_path],
+            [sys.executable, "-m", "chromainvert", "run", self.job_path],
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=self._stderr_file,
             text=True,
+            env=env,
         )
 
     def iter_events(self):
@@ -290,22 +340,54 @@ class EngineRunner:
                 continue
 
     def cancel(self) -> None:
-        if self.process is not None:
+        if self.process is not None and self.process.poll() is None:
             self.process.kill()
+
+    def _cleanup(self) -> None:
+        if self._stderr_file is not None:
+            try:
+                self._stderr_file.close()
+            except OSError:
+                pass
+            self._stderr_file = None
+        if self._stderr_path is not None:
+            try:
+                os.remove(self._stderr_path)
+            except OSError:
+                pass
+            self._stderr_path = None
+        if self.job_path is not None and os.path.exists(self.job_path):
+            try:
+                os.remove(self.job_path)
+            except OSError:
+                pass
+            self.job_path = None
 
     def wait(self) -> int:
         if self.process is None:
             return 0
+        timed_out = False
         try:
             code = self.process.wait(timeout=self.timeout)
         except subprocess.TimeoutExpired:
             self.process.kill()
-            code = -1
-        if self.process.stderr is not None:
-            self.stderr_tail = self.process.stderr.read() or ""
-        if self.job_path is not None and os.path.exists(self.job_path):
-            os.remove(self.job_path)
-            self.job_path = None
+            code = self.process.wait()
+            timed_out = True
+        if self._stderr_file is not None:
+            try:
+                self._stderr_file.close()
+            except OSError:
+                pass
+            self._stderr_file = None
+        if self._stderr_path is not None:
+            try:
+                with open(self._stderr_path, encoding="utf-8", errors="replace") as f:
+                    self.stderr_tail = f.read()[-2000:]
+            except OSError:
+                self.stderr_tail = ""
+            if timed_out:
+                self.stderr_tail += f"\nengine timed out after {self.timeout}s"
+        self._cleanup()
         return code
 
 
@@ -357,12 +439,20 @@ def main() -> int:
     if args.command == "preview":
         result = apply_lut_preview(args.src_video, args.cube_path, args.out_video)
         print(json.dumps(result))
-        return 0
+        return 0 if result["success"] else 1
     if args.command == "run":
-        job = json.loads(Path(args.job).read_text())
+        job_path = Path(args.job)
+        job = json.loads(job_path.read_text())
+        base = job_path.parent
+        for key in ("source_frames", "reference_frames"):
+            if key in job:
+                job[key] = [str(p if Path(p).is_absolute() else base / p) for p in job[key]]
+        for key in ("output_cube", "report_json"):
+            if key in job and not Path(job[key]).is_absolute():
+                job[key] = str(base / job[key])
         report = run_engine_stream(job)
         print(json.dumps(report))
-        return 0
+        return 0 if report.get("event") == "done" else 1
     return 0
 
 
