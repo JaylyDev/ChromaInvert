@@ -131,43 +131,43 @@ bool MainWindow::create() {
   }
 
   createChild(L"STATIC", L"Source frame:", SS_LEFT, hwnd_, 0, 12, 12, 110, 24);
-  sourceEdit_ = createChild(L"EDIT", L"", ES_LEFT | ES_AUTOHSCROLL | WS_BORDER,
+  sourceEdit_ = createChild(L"EDIT", L"", ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP,
                             hwnd_, IDC_SOURCE_EDIT, 124, 12, 380, 24);
-  createChild(L"BUTTON", L"Browse...", BS_PUSHBUTTON, hwnd_, IDC_BROWSE_SOURCE,
+  createChild(L"BUTTON", L"Browse...", BS_PUSHBUTTON | WS_TABSTOP, hwnd_, IDC_BROWSE_SOURCE,
               512, 12, 120, 24);
 
   createChild(L"STATIC", L"Reference frame:", SS_LEFT, hwnd_, 0, 12, 46, 110, 24);
-  referenceEdit_ = createChild(L"EDIT", L"", ES_LEFT | ES_AUTOHSCROLL | WS_BORDER,
+  referenceEdit_ = createChild(L"EDIT", L"", ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP,
                                hwnd_, IDC_REFERENCE_EDIT, 124, 46, 380, 24);
-  createChild(L"BUTTON", L"Browse...", BS_PUSHBUTTON, hwnd_, IDC_BROWSE_REFERENCE,
+  createChild(L"BUTTON", L"Browse...", BS_PUSHBUTTON | WS_TABSTOP, hwnd_, IDC_BROWSE_REFERENCE,
               512, 46, 120, 24);
 
   createChild(L"STATIC", L"Output .cube:", SS_LEFT, hwnd_, 0, 12, 80, 110, 24);
-  outputEdit_ = createChild(L"EDIT", L"", ES_LEFT | ES_AUTOHSCROLL | WS_BORDER,
+  outputEdit_ = createChild(L"EDIT", L"", ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP,
                             hwnd_, IDC_OUTPUT_EDIT, 124, 80, 380, 24);
-  createChild(L"BUTTON", L"Browse...", BS_PUSHBUTTON, hwnd_, IDC_BROWSE_OUTPUT,
+  createChild(L"BUTTON", L"Browse...", BS_PUSHBUTTON | WS_TABSTOP, hwnd_, IDC_BROWSE_OUTPUT,
               512, 80, 120, 24);
 
   createChild(L"STATIC", L"Strength:", SS_LEFT, hwnd_, 0, 12, 114, 70, 24);
-  strengthEdit_ = createChild(L"EDIT", L"1.0", ES_LEFT | ES_AUTOHSCROLL | WS_BORDER,
+  strengthEdit_ = createChild(L"EDIT", L"1.0", ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP,
                               hwnd_, IDC_STRENGTH_EDIT, 86, 114, 80, 24);
   createChild(L"STATIC", L"LUT size:", SS_LEFT, hwnd_, 0, 176, 114, 64, 24);
-  lutCombo_ = createChild(L"COMBOBOX", L"", CBS_DROPDOWNLIST | WS_VSCROLL,
+  lutCombo_ = createChild(L"COMBOBOX", L"", CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP,
                           hwnd_, IDC_LUT_COMBO, 244, 114, 70, 100);
   SendMessageW(lutCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"17"));
   SendMessageW(lutCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"33"));
   SendMessageW(lutCombo_, CB_SETCURSEL, 1, 0);
   createChild(L"STATIC", L"Device:", SS_LEFT, hwnd_, 0, 324, 114, 60, 24);
-  deviceCombo_ = createChild(L"COMBOBOX", L"", CBS_DROPDOWNLIST | WS_VSCROLL,
+  deviceCombo_ = createChild(L"COMBOBOX", L"", CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP,
                              hwnd_, IDC_DEVICE_COMBO, 388, 114, 100, 100);
   SendMessageW(deviceCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"auto"));
   SendMessageW(deviceCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"cuda"));
   SendMessageW(deviceCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"cpu"));
   SendMessageW(deviceCombo_, CB_SETCURSEL, 0, 0);
 
-  matchButton_ = createChild(L"BUTTON", L"Match", BS_PUSHBUTTON, hwnd_,
+  matchButton_ = createChild(L"BUTTON", L"Match", BS_PUSHBUTTON | WS_TABSTOP, hwnd_,
                              IDC_MATCH_BUTTON, 12, 148, 120, 30);
-  cancelButton_ = createChild(L"BUTTON", L"Cancel", BS_PUSHBUTTON | WS_DISABLED,
+  cancelButton_ = createChild(L"BUTTON", L"Cancel", BS_PUSHBUTTON | WS_DISABLED | WS_TABSTOP,
                               hwnd_, IDC_CANCEL_BUTTON, 140, 148, 120, 30);
   statusLabel_ = createChild(L"STATIC", L"Idle.", SS_LEFT, hwnd_, 0, 272, 152,
                              360, 24);
