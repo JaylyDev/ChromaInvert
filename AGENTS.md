@@ -17,7 +17,9 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `engine/chromainvert/optimize.py`: Adam optimization loop with seeded pixel sampling and the `OptimizeConfig` weights.
 - `engine/chromainvert/cli.py`: `chromainvert run job.json` and `chromainvert benchmark` entry points.
 - `engine/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000).
-- `app/`: C++ desktop host skeleton (FFmpeg pipeline, preview UI). Not yet implemented.
+- `app/CMakeLists.txt`, `app/src/main.cpp`, `app/src/MainWindow.*`, `app/src/JobRunner.*`: Win32 desktop host skeleton (file pickers, Match and Cancel, progress bar, log pane). JobRunner writes `job.json`, spawns the engine, parses stdout JSONL progress. Qt port is a follow-up per `docs/GUI_DECISION.md`.
+- `app/README.md`: Windows build and run steps for the desktop host.
+- `docs/GUI_DECISION.md`: Qt 6 versus ImGui framework decision (Qt 6 is the product target, Win32 host ships now).
 - `scripts/validate_cube.py`: FFmpeg `lut3d` acceptance check for exported cubes.
 - `scripts/run_benchmark.py`: runs the synthetic benchmark and writes `work/benchmark.json`.
 - `docs/CHROMAINVERT_HACKATHON_PLAN.md`: full technical plan and team guide.

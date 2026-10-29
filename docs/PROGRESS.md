@@ -1,5 +1,22 @@
 # ChromaInvert Progress Log
 
+## 2026-10-29: GUI framework decision and Win32 main window skeleton
+
+Completed:
+- Added `docs/GUI_DECISION.md`: Qt 6 versus ImGui decision. Qt 6 is the product target; ImGui is the runner-up for scopes work. The shippable milestone is a native Win32 host with zero third party GUI deps, and the Qt port reuses the same `job.json` contract later.
+- Added `app/CMakeLists.txt`, `app/src/main.cpp`, `app/src/MainWindow.h`, `app/src/MainWindow.cpp`, `app/src/JobRunner.h`, `app/src/JobRunner.cpp`, `app/README.md`: main window with source and reference file pickers, output `.cube` picker, Strength edit, LUT size and device combos, Match and Cancel buttons, progress bar, status label, and log pane. JobRunner writes `job.json` (contract v1), spawns `python -m chromainvert run`, and parses stdout JSONL into progress and done messages. Removed obsolete `app/.gitkeep`.
+- Recorded the new files under Parts of the project in `AGENTS.md`.
+
+Verified:
+- `cmake -B build -S app -G "Visual Studio 17 2022" -A x64` plus `cmake --build build --config Release`: clean build with MSVC 19.44, zero warnings, `build/Release/ChromaInvert.exe` launches and shows its main window.
+- `python -m pytest engine/tests -q`: 46 passed.
+- `python scripts/validate_cube.py`: PASS.
+- SampleFootage end to end on the JobRunner contract path: ffprobe confirms the Rec709 clip is BT.709 limited range, extracted source and reference frames, ran the engine (100 plus 10 iterations, GPU, 3.7 s) to `{"event": "done"}` with a valid `.cube`, and applied it with FFmpeg `lut3d`.
+
+Notes:
+- The skeleton grades still frames only; video decoding and frame sampling belong to issue #10 and scopes belong to issue #11, so no preview or scopes code was added here.
+- The AGENTS.md council review step was skipped: child agents cannot spawn subagents, so a careful self review (warnings clean, tests green, contract fields cross checked against `cli.py`) stands in for it.
+
 ## 2026-10-27: CI, GitHub Actions test workflow
 
 Completed:
