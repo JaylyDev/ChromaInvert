@@ -39,7 +39,8 @@ stdout JSONL progress lines into the progress bar. Cancel kills the engine
 process. The log pane shows the engine output tail for debugging.
 
 Contract v1 only grades still frames in the `rec709` profile. Video file
-decoding and frame sampling land with issue #10; scopes land with issue #11.
+decoding and frame sampling for issue #10 live in the shared FFmpeg module
+below and in the console host; scopes land with issue #11.
 
 ## Console host (`chromainvert-host`)
 
@@ -100,3 +101,35 @@ Notes:
 - Contract v1 accepts `rec709` only; other profiles are rejected up front.
 - Progress lines from the engine (`progress` events) stream to stdout;
   anything else the engine prints is echoed with an `engine:` prefix.
+
+## Shared FFmpeg module (`src/ffmpeg.*`, `src/Preview.*`)
+
+Level 1 uses FFmpeg and ffprobe executables as subprocesses. `src/ffmpeg.*`
+is the single unified module serving both hosts:
+
+- `host::` helpers for the console driver: ffprobe duration probe, single
+  frame extraction with output verification, `lut3d` preview encode, and
+  video path detection. Explicit frame paths are absolutized and the work
+  directory is created before extraction.
+- The `Ffmpeg` class for the desktop host: rich ffprobe JSON parsing (codec,
+  size, fps with `r_frame_rate` fallback, pix fmt, color tags, bit depth,
+  audio), multi-frame extraction at even fractions with 16-bit PNG plus 8-bit
+  fallback, `lut3d` preview encode with tetrahedral interpolation, and
+  before/after still grabs. Output directories are created, outputs are
+  verified non-empty, and unsafe path characters are refused.
+- `lut3d` path escaping uses unquoted double-level escaping (`:` as `\\:`,
+  `'` as `\\\'`, `,` `;` `[` `]` single-escaped), verified by brute force
+  against FFmpeg 9: colon, space, apostrophe, comma, semicolon, and bracket
+  cube paths all pass in the C++ harness and in `scripts/ffmpeg_helpers.py`.
+- `src/Preview.*` encodes a graded preview clip from a source video plus cube
+  and grabs before/after stills through the `Ffmpeg` class.
+
+The Python mirror is `scripts/ffmpeg_helpers.py`: ffprobe parsing, 16-bit PNG
+frame extraction, `lut3d` preview, before/after stills, an `EngineRunner`, and
+the same error surfaces as the C++ code.
+
+## Level 2 plan
+
+Link libavformat, libavcodec, and libswscale via vcpkg for in-app decode and
+real-time preview. Add find_package(FFmpeg) and link against the targets. No
+change to Level 1 commands.

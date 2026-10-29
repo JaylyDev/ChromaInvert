@@ -6,12 +6,32 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Level 1 resolves ffmpeg and ffprobe from PATH at runtime; the checks below
+# are configure-time hints only. Level 2 (libav) can be added later via vcpkg
+# with find_package(FFmpeg) and linking libavformat, libavcodec, libswscale,
+# and libavutil.
+
+find_program(FFMPEG_EXECUTABLE ffmpeg)
+find_program(FFPROBE_EXECUTABLE ffprobe)
+if(NOT FFMPEG_EXECUTABLE)
+  message(WARNING "ffmpeg not found on PATH; install FFmpeg before running")
+endif()
+if(NOT FFPROBE_EXECUTABLE)
+  message(WARNING "ffprobe not found on PATH; install FFmpeg before running")
+endif()
+
 add_executable(ChromaInvert WIN32
   src/main.cpp
   src/MainWindow.cpp
   src/JobRunner.cpp
+  src/ffmpeg.cpp
+  src/Preview.cpp
+  src/job_runner.cpp
   src/MainWindow.h
   src/JobRunner.h
+  src/ffmpeg.h
+  src/Preview.h
+  src/job_runner.h
 )
 
 target_include_directories(ChromaInvert PRIVATE src)
