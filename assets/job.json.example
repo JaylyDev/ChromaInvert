@@ -1,0 +1,15 @@
+{
+  "contract_version": 1,
+  "source_frames": ["frames/source/source_001.png"],
+  "reference_frames": ["frames/reference/ref_001.png"],
+  "input_profile": "rec709",
+  "coarse_size": 17,
+  "lut_size": 33,
+  "iterations": 150,
+  "fine_iterations": 30,
+  "strength": 1.0,
+  "seed": 42,
+  "device": "auto",
+  "output_cube": "out.cube",
+  "report_json": "report.json"
+}

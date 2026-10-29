@@ -20,6 +20,13 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `app/`: C++ desktop host skeleton (FFmpeg pipeline, preview UI). Not yet implemented.
 - `scripts/validate_cube.py`: FFmpeg `lut3d` acceptance check for exported cubes.
 - `scripts/run_benchmark.py`: runs the synthetic benchmark and writes `work/benchmark.json`.
+- `scripts/validate_real_footage.py`: validates a real-footage cube (size, finiteness, range, neighbor delta, FFmpeg lut3d, optional DeltaE).
+- `scripts/extract_frames.py`: extracts N frames from a video via FFmpeg.
+- `scripts/run_real_footage.py`: reusable driver for frame extraction, job creation, run, and validation with synthetic fallback.
+- `docs/DEMO_SCRIPT.md`: 3-minute demo script and real-footage quickstart.
+- `engine/tests/test_real_footage.py`: real-footage CLI and optimize smoke tests.
+- `engine/chromainvert/__main__.py`: enables `python -m chromainvert`.
+- `assets/job.json.example`: tracked sample job for the real-footage CLI run.
 - `docs/CHROMAINVERT_HACKATHON_PLAN.md`: full technical plan and team guide.
 - `docs/ARCHITECTURE.md`: engine contract v1 (`job.json` schema, stdout JSONL protocol, `report.json` fields, color pipeline).
 - `docs/PROGRESS.md`: timestamped build log, updated with every feature.

@@ -63,3 +63,23 @@ Verified:
 - `python -m pytest engine/tests -q`: 5 passed (round trip at sizes 2, 17, 33, axis order, domain, rejection of bad files, writer validation).
 - `python scripts/validate_cube.py`: PASS. Identity 33 LUT applied with FFmpeg `lut3d` gives pixel-identical output (peak diff 0.0). Channel-swap LUT turns pure red into blue, confirming lattice axis order matches FFmpeg.
 
+## 2026-10-29: Feature, Real-footage CLI run and validation
+
+Completed:
+- Added `engine/chromainvert/__main__.py` so `python -m chromainvert` works.
+- Extracted 3 source frames from Rec709 clip `A001_10290006_C101.mov` into `work/frames/source/`.
+- Created warm graded reference frames `work/frames/reference/ref_001.png` and `ref_002.png`.
+- Added `assets/job.json.example` (tracked sample; contract v1, rec709, coarse 17, lut 33, 150 + 30 iters). The scratch `work/job.json` used for the live run is gitignored.
+- Added `scripts/validate_real_footage.py`: reads cube, checks size, finiteness, range, neighbor delta, title, domain, FFmpeg lut3d, DeltaE effect magnitude.
+- Set LUT title to `ChromaInvert` in `engine/chromainvert/cli.py` so exported cubes carry a non-empty title.
+- Added `scripts/extract_frames.py` and `scripts/run_real_footage.py` (frame extraction, job creation, run, validation, synthetic fallback).
+- Added `docs/DEMO_SCRIPT.md` and README real-footage quickstart.
+- Added `engine/tests/test_real_footage.py` (8-bit PNG handling, optimize + CLI smoke).
+
+Verified:
+- `python -m chromainvert run work/job.json`: done in 3.67s, `work/out.cube` (33), `work/report.json` (device cuda, lattice_min 0.0, lattice_max 1.0, max_neighbor_delta 0.1357).
+- `python scripts/validate_cube.py`: PASS.
+- `python scripts/validate_real_footage.py work/out.cube work/frames/source/source_001.png`: PASS (effect magnitude dE00 11.0174, informational).
+- `python scripts/run_benchmark.py`: improvement reported, no regression.
+- `python -m pytest engine/tests -q`: 49 passed.
+
