@@ -17,8 +17,12 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `engine/chromainvert/optimize.py`: Adam optimization loop with seeded pixel sampling, the `OptimizeConfig` weights, and the `deterministic` GPU mode flag.
 - `engine/chromainvert/cli.py`: `chromainvert run job.json` and `chromainvert benchmark` entry points.
 - `engine/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000) plus the seeded random-RGB probe heldout gate.
-- `app/CMakeLists.txt`, `app/src/main.cpp`, `app/src/MainWindow.*`, `app/src/JobRunner.*`: Win32 desktop host skeleton (file pickers, Match and Cancel, progress bar, log pane). JobRunner writes `job.json`, spawns the engine, parses stdout JSONL progress. Qt port is a follow-up per `docs/GUI_DECISION.md`.
-- `app/README.md`: Windows build and run steps for the desktop host.
+- `app/CMakeLists.txt`: builds both the Win32 `ChromaInvert` desktop host and the `chromainvert-host` console driver (C++17, standard library only).
+- `app/src/main.cpp`, `app/src/MainWindow.*`, `app/src/JobRunner.*`: Win32 desktop host skeleton (file pickers, Match and Cancel, progress bar, log pane). JobRunner writes `job.json`, spawns the engine, parses stdout JSONL progress. Qt port is a follow-up per `docs/GUI_DECISION.md`.
+- `app/src/host_main.cpp`: `chromainvert-host run` and `preview` subcommands, flag parsing, frame extraction orchestration.
+- `app/src/job_runner.h`, `app/src/job_runner.cpp`: `job.json` writer (contract v1), engine subprocess spawn with JSONL progress parsing, `report.json` summary.
+- `app/src/ffmpeg.h`, `app/src/ffmpeg.cpp`: ffprobe duration probe, frame extraction, `lut3d` preview encode.
+- `app/README.md`: Windows build and run steps for both hosts.
 - `docs/GUI_DECISION.md`: Qt 6 versus ImGui framework decision (Qt 6 is the product target, Win32 host ships now).
 - `scripts/validate_cube.py`: FFmpeg `lut3d` acceptance check for exported cubes.
 - `scripts/premiere_validation.py`: FFmpeg `lut3d` vs Python `DifferentiableLUT3D` comparison with tetrahedral gap check and optional Premiere still scoring.

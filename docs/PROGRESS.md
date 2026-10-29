@@ -121,6 +121,21 @@ Notes:
 - The skeleton grades still frames only; video decoding and frame sampling belong to issue #10 and scopes belong to issue #11, so no preview or scopes code was added here.
 - The AGENTS.md council review step was skipped: child agents cannot spawn subagents, so a careful self review (warnings clean, tests green, contract fields cross checked against `cli.py`) stands in for it.
 
+## 2026-10-29: C++ console host driving the pipeline (jayly/console-host)
+
+Completed:
+- Added `app/CMakeLists.txt` (C++17, standard library only), `app/src/main.cpp` (`run` and `preview` subcommands), `app/src/job_runner.*` (contract v1 `job.json` writer, engine spawn with JSONL progress parsing, `report.json` summary), `app/src/ffmpeg.*` (ffprobe duration, frame extraction, `lut3d` preview), `app/README.md` (build and run quickstart).
+- `run` extracts source frames at 25/50/75 percent and the reference middle frame (or takes explicit `--source-frames`/`--reference-frames`), writes `job.json` with `contract_version` 1, streams engine `progress` events as `[engine i/n]`, then prints device, seconds, final loss, and lattice stats from `report.json`. `preview` applies any `.cube` to an image or clip.
+- Contract v1 guardrails mirror the engine: `rec709` only, `strength` in [0, 1], lattice sizes of at least 2, non-negative iteration counts with a positive total, fractions in [0, 1). Explicit frame paths are absolutized so CWD-relative inputs resolve; extracted frames stay job-dir relative per `docs/ARCHITECTURE.md`.
+- Council review (Muse Wonder) returned NO-GO with 7 must-fix defects; all were reproduced and fixed: `lut3d` filter escaping wraps the path in single quotes with backslash, colon, and quote escapes (absolute Windows cube paths verified through the host); shell arguments with expansion characters are refused; a `done` line no longer overrides a nonzero engine exit and requires a non-empty cube; `--job-file`, `--output-cube`, and `--report-json` must be plain file names; numeric flags use strict integer parsing with finite-double checks; `extract_frame` verifies the output file exists and is non-empty; JSONL string decoding handles all escapes including `\uXXXX` with surrogate pairs.
+- Fixed a Windows `cmd /c` quoting pitfall: commands starting with a quoted exe name lose their outer quotes, so every spawned command is prefixed with `call ` via `shell_command()`. Found because `probe_duration` failed while the same ffprobe line worked in the shell.
+
+Verified:
+- `python -m pytest engine/tests -q`: 46 passed.
+- `python scripts/validate_cube.py`: PASS.
+- End-to-end on SampleFootage Rec709 clip (`A001_10290006_C101.mov`, 9.4 s): 5 plus 2 iterations on GPU in about 3 s, `out.cube` plus `report.json` written, PNG preview and graded MP4 preview encoded. Explicit-frames rerun with `--preview-out` also green. Absolute cube path preview and all council repro cases verified.
+- Recorded the new app files under Parts of the project in `AGENTS.md`.
+
 ## 2026-10-27: CI, GitHub Actions test workflow
 
 Completed:
