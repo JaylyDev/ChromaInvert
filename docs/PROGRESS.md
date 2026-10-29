@@ -1,5 +1,13 @@
 # ChromaInvert Progress Log
 
+## 2026-10-29: Fix, harden premiere_validation I/O
+
+Completed:
+- Hardened `read_rgb` in `scripts/premiere_validation.py` to handle grayscale and 16-bit inputs (dtype-aware scaling, channel expansion), matching `load_frames` in `engine/chromainvert/cli.py`.
+- Hardened `write_rgb` to create parent directories and expand grayscale images to RGB.
+- Ensured `main()` creates the output report's parent directory.
+- Verified `python scripts/premiere_validation.py` still prints PASS and the full engine suite stays green.
+
 ## 2026-10-29: Feature, Premiere Pro validation run
 
 Completed:

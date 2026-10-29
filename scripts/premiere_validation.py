@@ -19,11 +19,29 @@ from chromainvert.lut_module import DifferentiableLUT3D
 
 
 def read_rgb(path: Path) -> NDArray[np.float32]:
-    return imageio.imread(path)[..., :3].astype(np.float32) / 255.0
+    raw = imageio.imread(path)
+    if raw.ndim == 2:
+        raw = np.stack((raw, raw, raw), axis=-1)
+    if raw.ndim != 3 or raw.shape[-1] not in (3, 4):
+        raise ValueError(f"expected an RGB image, got shape {raw.shape}")
+    if np.issubdtype(raw.dtype, np.integer):
+        scale = float(np.iinfo(raw.dtype).max)
+    elif np.issubdtype(raw.dtype, np.floating):
+        scale = 1.0
+    else:
+        raise ValueError(f"unsupported image dtype: {raw.dtype}")
+    return (raw[..., :3].astype(np.float32) / scale)
 
 
 def write_rgb(path: Path, image: NDArray[np.floating]) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     pixels = np.clip(np.asarray(image), 0.0, 1.0)
+    if pixels.ndim == 2:
+        pixels = np.stack((pixels, pixels, pixels), axis=-1)
+    if pixels.ndim != 3 or pixels.shape[-1] not in (3, 4):
+        raise ValueError(f"expected an RGB image, got shape {pixels.shape}")
+    pixels = pixels[..., :3]
     imageio.imwrite(path, (pixels * 255.0 + 0.5).astype(np.uint8))
 
 
@@ -91,6 +109,7 @@ def main() -> int:
     args = parser.parse_args()
     args.workdir.mkdir(parents=True, exist_ok=True)
     out_path = args.out if args.out is not None else args.workdir / "premiere_validation.json"
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
 
     if args.source is not None:
         source = read_rgb(args.source)
