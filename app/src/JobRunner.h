@@ -25,7 +25,7 @@ struct JobConfig {
 };
 
 class JobRunner {
-public:
+ public:
   JobRunner();
   ~JobRunner();
 
@@ -37,14 +37,20 @@ public:
   bool running() const;
   std::wstring lastError() const;
 
-private:
+ private:
+  struct ThreadArgs {
+    JobRunner* self;
+    JobConfig config;
+    HWND notify;
+  };
+
   static DWORD WINAPI threadEntry(LPVOID param);
   void run(const JobConfig& config, HWND notify);
   bool writeJobJson(const JobConfig& config, const std::wstring& jobPath,
                     const std::wstring& reportPath, std::wstring& error);
 
   HANDLE thread_ = nullptr;
-  HANDLE child_ = nullptr;
+  std::atomic<HANDLE> child_ = nullptr;
   std::atomic<bool> cancelRequested_ = false;
   std::atomic<bool> running_ = false;
   std::wstring lastError_;

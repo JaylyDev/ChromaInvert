@@ -9,7 +9,7 @@ pane. See `docs/GUI_DECISION.md` for the Qt 6 versus ImGui decision and
 
 - CMake 3.20 or newer
 - MSVC 2022 (`vcvars64.bat`) or MinGW-w64 GCC 13+
-- FFmpeg and ffprobe on PATH
+- FFmpeg and ffprobe on PATH (validation scripts and later preview work)
 - Python 3.10+ with `pip install -e ./engine` from the repo root
 
 ## Build

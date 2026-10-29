@@ -3,7 +3,7 @@
 #include "MainWindow.h"
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE /*prev*/, PWSTR /*cmd*/, int /*show*/) {
-  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
   MainWindow window(instance);
   if (!window.create()) {
     MessageBoxW(nullptr, L"Could not create the main window.", L"ChromaInvert",

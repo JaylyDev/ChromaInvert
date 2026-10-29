@@ -41,8 +41,8 @@ Verdict: kept as fallback; the console host for issue #3 provides this.
 
 The pragmatic choice for issue #9 is a native Win32 host that satisfies the one-screen spec without external dependencies:
 
-- Why now: builds with only the Windows SDK and C++17. Works with MSVC (vcvars64) and MinGW 13.2 already on the machine. No vcpkg, no Qt download, cmake builds in seconds.
-- What it proves: file pickers, Match button, progress bar driven by engine JSONL, device badge, Strength and LUT size controls, before and after preview with wipe slider, collapsible log pane, and JobRunner that writes job.json and spawns `chromainvert run`. These are exactly the acceptance criteria for #9.
+- Why now: builds with only the Windows SDK and C++17. Works with MSVC (vcvars64) and MinGW-w64 GCC 13+ already on the machine. No vcpkg, no Qt download, cmake builds in seconds.
+- What it proves: file pickers, Match and Cancel buttons, progress bar driven by engine JSONL, Strength plus LUT size plus device controls, log pane, and a JobRunner that writes `job.json` (contract v1) and spawns `chromainvert run`. These are exactly the acceptance criteria for #9. Preview with wipe slider, scopes, and a device badge are follow-up issues, not part of this skeleton.
 - Migration path: the window class and JobRunner use the same job.json contract as the Qt design. Swapping the Win32 MainWindow for a QMainWindow is a follow-up: same fields, same signals, same FFmpeg subprocess layer. That follow-up adds the Qt sources plus a `CHROMAINVERT_USE_QT` CMake switch.
 
 If Qt 6 is found, the build can be switched on; until then the Win32 host is the shippable demo artifact.
@@ -50,8 +50,8 @@ If Qt 6 is found, the build can be switched on; until then the Win32 host is the
 ## Consequences
 
 - Build: `cmake -B build -S app` then `cmake --build build` produces `build/Release/ChromaInvert.exe`.
-- Runtime deps: `ffmpeg` and `ffprobe` on PATH, Python with `chromainvert` installed. Missing tools show a plain language dialog and a log line, per Section 8.4.
-- No embedded Python: subprocess plus files, per Section 4.1. The log pane shows exact ffmpeg commands and the JSONL tail.
+- Runtime deps: Python with `chromainvert` installed on PATH. Missing tools show a plain language dialog and a log line, per Section 8.4. FFmpeg and ffprobe are used by the validation scripts; host-driven preview arrives with #10.
+- No embedded Python: subprocess plus files, per Section 4.1. The log pane shows the engine JSONL tail.
 - Next issues: #10 (FFmpeg decode and preview link) and #11 (scopes) build on this host without framework churn.
 
 ## Build steps for Windows (documented here and in app/README.md)
@@ -79,6 +79,6 @@ cmake --build build
 The Qt port adds the QMainWindow sources and the switch above; until then the Win32 host is the shippable demo artifact.
 
 Notes:
-- The app is DPI aware via embedded manifest; no external manifest needed.
-- JobRunner writes `work/job.json` and reads `work/out.cube` and `work/report.json`; all paths may be absolute.
+- The app opts into system DPI awareness at startup so the fixed-pixel layout scales as a unit; per-monitor layout scaling is a follow-up. No external manifest needed.
+- JobRunner writes `job.json` and `report.json` next to the chosen output `.cube` path; all job paths may be absolute (relative typed paths are canonicalized first).
 - Progress is JSONL on stdout; cancellation kills the child process.

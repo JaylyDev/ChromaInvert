@@ -20,12 +20,18 @@ target_compile_definitions(ChromaInvert PRIVATE
   _UNICODE
   WIN32_LEAN_AND_MEAN
   NOMINMAX
+  WINVER=0x0A00
+  _WIN32_WINNT=0x0A00
 )
 
 if(MSVC)
   target_compile_options(ChromaInvert PRIVATE /W4)
 else()
   target_compile_options(ChromaInvert PRIVATE -Wall -Wextra)
+endif()
+
+if(MINGW)
+  target_link_options(ChromaInvert PRIVATE -municode)
 endif()
 
 target_link_libraries(ChromaInvert PRIVATE comctl32 gdi32)

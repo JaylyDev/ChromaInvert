@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 
+#include <cmath>
 #include <commctrl.h>
 #include <commdlg.h>
 
@@ -34,6 +35,20 @@ std::wstring getEditText(HWND edit) {
   return text;
 }
 
+std::wstring toAbsolute(const std::wstring& path) {
+  DWORD needed = GetFullPathNameW(path.c_str(), 0, nullptr, nullptr);
+  if (needed == 0) {
+    return path;
+  }
+  std::wstring out(static_cast<size_t>(needed), L'\0');
+  DWORD written = GetFullPathNameW(path.c_str(), needed, out.data(), nullptr);
+  if (written == 0 || written >= needed) {
+    return path;
+  }
+  out.resize(static_cast<size_t>(written));
+  return out;
+}
+
 HWND createChild(const wchar_t* className, const wchar_t* text, DWORD style,
                  HWND parent, int id, int x, int y, int width, int height) {
   return CreateWindowExW(0, className, text, style | WS_CHILD | WS_VISIBLE, x, y,
@@ -43,7 +58,7 @@ HWND createChild(const wchar_t* className, const wchar_t* text, DWORD style,
 
 bool pickOpenFile(HWND owner, const wchar_t* filter, std::wstring& selected) {
   wchar_t path[4096] = {0};
-  OPENFILENAMEW dialog = {0};
+  OPENFILENAMEW dialog{};
   dialog.lStructSize = sizeof(dialog);
   dialog.hwndOwner = owner;
   dialog.lpstrFilter = filter;
@@ -60,7 +75,7 @@ bool pickOpenFile(HWND owner, const wchar_t* filter, std::wstring& selected) {
 bool pickSaveFile(HWND owner, const wchar_t* filter, const wchar_t* defExt,
                   std::wstring& selected) {
   wchar_t path[4096] = {0};
-  OPENFILENAMEW dialog = {0};
+  OPENFILENAMEW dialog{};
   dialog.lStructSize = sizeof(dialog);
   dialog.hwndOwner = owner;
   dialog.lpstrFilter = filter;
@@ -86,15 +101,19 @@ MainWindow::~MainWindow() {
 }
 
 bool MainWindow::create() {
-  INITCOMMONCONTROLSEX controls = {sizeof(controls), ICC_PROGRESS_CLASS};
+  INITCOMMONCONTROLSEX controls{};
+  controls.dwSize = sizeof(controls);
+  controls.dwICC = ICC_PROGRESS_CLASS;
   InitCommonControlsEx(&controls);
 
-  NONCLIENTMETRICSW metrics = {sizeof(metrics)};
+  NONCLIENTMETRICSW metrics{};
+  metrics.cbSize = sizeof(metrics);
   if (SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof(metrics), &metrics, 0)) {
     font_ = CreateFontIndirectW(&metrics.lfMessageFont);
   }
 
-  WNDCLASSEXW cls = {sizeof(cls)};
+  WNDCLASSEXW cls{};
+  cls.cbSize = sizeof(cls);
   cls.lpfnWndProc = &MainWindow::windowProc;
   cls.hInstance = instance_;
   cls.hCursor = LoadCursorW(nullptr, IDC_ARROW);
@@ -162,6 +181,13 @@ bool MainWindow::create() {
                           ES_READONLY | WS_BORDER | WS_VSCROLL, hwnd_, 0, 12, 248,
                           620, 252);
 
+  if (sourceEdit_ == nullptr || referenceEdit_ == nullptr || outputEdit_ == nullptr ||
+      strengthEdit_ == nullptr || lutCombo_ == nullptr || deviceCombo_ == nullptr ||
+      matchButton_ == nullptr || cancelButton_ == nullptr || progress_ == nullptr ||
+      statusLabel_ == nullptr || logEdit_ == nullptr) {
+    return false;
+  }
+
   EnumChildWindows(hwnd_, [](HWND child, LPARAM font) -> BOOL {
     SendMessageW(child, WM_SETFONT, static_cast<WPARAM>(font), TRUE);
     return TRUE;
@@ -173,12 +199,15 @@ bool MainWindow::create() {
 }
 
 int MainWindow::run() {
-  MSG message = {0};
-  while (GetMessageW(&message, nullptr, 0, 0)) {
-    TranslateMessage(&message);
-    DispatchMessageW(&message);
+  MSG message{};
+  int status = 0;
+  while ((status = GetMessageW(&message, nullptr, 0, 0)) > 0) {
+    if (!IsDialogMessageW(hwnd_, &message)) {
+      TranslateMessage(&message);
+      DispatchMessageW(&message);
+    }
   }
-  return static_cast<int>(message.wParam);
+  return (status < 0) ? 1 : static_cast<int>(message.wParam);
 }
 
 HWND MainWindow::handle() const {
@@ -191,6 +220,7 @@ LRESULT CALLBACK MainWindow::windowProc(HWND hwnd, UINT message, WPARAM wParam,
   if (message == WM_NCCREATE) {
     CREATESTRUCTW* created = reinterpret_cast<CREATESTRUCTW*>(lParam);
     self = static_cast<MainWindow*>(created->lpCreateParams);
+    self->hwnd_ = hwnd;
     SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
   } else {
     self = reinterpret_cast<MainWindow*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
@@ -261,25 +291,32 @@ void MainWindow::onBrowseOutput() {
 }
 
 bool MainWindow::collectConfig(JobConfig& config) {
-  config.sourceFile = getEditText(sourceEdit_);
-  config.referenceFile = getEditText(referenceEdit_);
-  config.outputCube = getEditText(outputEdit_);
+  config.sourceFile = toAbsolute(getEditText(sourceEdit_));
+  config.referenceFile = toAbsolute(getEditText(referenceEdit_));
+  config.outputCube = toAbsolute(getEditText(outputEdit_));
   if (config.sourceFile.empty() || config.referenceFile.empty() ||
       config.outputCube.empty()) {
     MessageBoxW(hwnd_, L"Pick a source frame, a reference frame, and an output .cube path.",
                 L"ChromaInvert", MB_OK | MB_ICONWARNING);
     return false;
   }
-  if (GetFileAttributesW(config.sourceFile.c_str()) == INVALID_FILE_ATTRIBUTES ||
-      GetFileAttributesW(config.referenceFile.c_str()) == INVALID_FILE_ATTRIBUTES) {
+  DWORD sourceAttrs = GetFileAttributesW(config.sourceFile.c_str());
+  DWORD referenceAttrs = GetFileAttributesW(config.referenceFile.c_str());
+  if (sourceAttrs == INVALID_FILE_ATTRIBUTES ||
+      referenceAttrs == INVALID_FILE_ATTRIBUTES ||
+      (sourceAttrs & FILE_ATTRIBUTE_DIRECTORY) != 0 ||
+      (referenceAttrs & FILE_ATTRIBUTE_DIRECTORY) != 0) {
     MessageBoxW(hwnd_, L"Source or reference file does not exist.", L"ChromaInvert",
                 MB_OK | MB_ICONWARNING);
     return false;
   }
+  std::wstring strengthText = getEditText(strengthEdit_);
+  const wchar_t* begin = strengthText.c_str();
   wchar_t* end = nullptr;
-  double strength = wcstod(getEditText(strengthEdit_).c_str(), &end);
-  if (end == nullptr || *end != L'\0' || strength < 0.0) {
-    MessageBoxW(hwnd_, L"Strength must be a number at or above 0.", L"ChromaInvert",
+  double strength = wcstod(begin, &end);
+  if (end == begin || *end != L'\0' || !std::isfinite(strength) || strength < 0.0 ||
+      strength > 1.0) {
+    MessageBoxW(hwnd_, L"Strength must be a number between 0 and 1.", L"ChromaInvert",
                 MB_OK | MB_ICONWARNING);
     return false;
   }

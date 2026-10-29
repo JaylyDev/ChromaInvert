@@ -1,5 +1,15 @@
 # ChromaInvert Progress Log
 
+## 2026-10-29: Wonder review findings on the GUI host
+
+Completed:
+- Addressed the independent Muse Wonder review of PR #24 (verdict: changes requested): reworked `JobRunner` process and thread ownership (atomic child handle, sole-owner close, prior thread reaped before reuse, exactly one terminal `WM_JOB_DONE` posted after the child is waited on), ASCII-safe `job.json` emission with wide-path file open, strength validation clamped to `[0, 1]` with empty and non-finite rejection, absolute path canonicalization, done summary from the known output path, failed-post cleanup, `hwnd_` set at `WM_NCCREATE`, dialog keyboard navigation with tri-state `GetMessage`, child-window creation checks, directory rejection, round-trippable strength formatting, final partial-line drain, MinGW `-municode` plus `WINVER` defines with brace struct init, system DPI awareness until layout scaling lands, corrected `docs/GUI_DECISION.md` claims, and a Windows MSVC build job in CI.
+- Aligned the engine with the contract: `cli.py` reads the job file as UTF-8 and the omitted-key `fine_iterations` fallback is 30, matching `ARCHITECTURE.md` and `OptimizeConfig`.
+
+Verified:
+- MSVC 19.44 Release clean with zero warnings; pytest 46 passed.
+- Pending rerun of the exe window-handle smoke and the FFmpeg acceptance checks before merge.
+
 ## 2026-10-29: GUI framework decision and Win32 main window skeleton
 
 Completed:
