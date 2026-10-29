@@ -23,6 +23,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Configure app
-        run: cmake -B build -S app -G "Visual Studio 17 2022" -A x64
+        run: cmake -B build -S app -A x64
       - name: Build app
         run: cmake --build build --config Release

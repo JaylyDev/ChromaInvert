@@ -1,5 +1,17 @@
 # ChromaInvert Progress Log
 
+## 2026-10-29: Wonder re-review fixes for the GUI host
+
+Completed:
+- Added `engine/chromainvert/__main__.py` so the `python -m chromainvert run` command that `JobRunner` spawns works on this branch (already present on main via the real-footage work).
+- Added `WS_TABSTOP` to the interactive `MainWindow` controls so the `IsDialogMessageW` keyboard navigation actually moves focus between fields.
+- Dropped the pinned Visual Studio 17 2022 generator from the `build-windows` CI job: current `windows-latest` runners ship Visual Studio 2026 only, so CMake now selects the default MSVC generator.
+
+Verified:
+- MSVC 19.44 Release and MinGW-w64 GCC 13.2 builds clean with zero compiler warnings; window-handle smoke passed for both executables (title `ChromaInvert`, graceful exit code 0).
+- `JobRunner` harness against a Unicode output directory (accented and CJK characters): exactly one `WM_JOB_DONE` on success (exit code 0, `.cube` and report written, ASCII-only `job.json`, strength round-trips) and exactly one on cancel (`Cancelled.`, no orphan engine process).
+- `python -m pytest engine/tests -q`: 46 passed. `python scripts/validate_cube.py`: PASS. Workflow YAML parses.
+
 ## 2026-10-29: Wonder review findings on the GUI host
 
 Completed:
