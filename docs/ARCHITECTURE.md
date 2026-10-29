@@ -45,7 +45,7 @@ Final loss terms per name, `device` actually used, `seconds`, lattice stats (`la
 
 ## Color pipeline
 
-1. Frames load as display-referred values in `[0, 1]`. The `rec709` profile applies `srgb_to_linear`. The `apple_log` profile applies the Apple Log inverse OETF (Rec.2020 primaries), converts linear Rec.2020 to linear Rec.709, and clips to `[0, 1]` for a bounded SDR working space. S-Log3 decoding exists in `color.py` but its HDR range has no bounded working-space design yet, so the CLI refuses it rather than silently clipping highlights.
+1. Frames load as display-referred values in `[0, 1]`. The `rec709` profile applies `srgb_to_linear`. The `apple_log` profile applies the Apple Log inverse OETF (Rec.2020 primaries), converts linear Rec.2020 to linear Rec.709, and clips to `[0, 1]` for a bounded SDR working space. The selected profile applies to both source and reference frames. S-Log3 decoding exists in `color.py` but its HDR range has no bounded working-space design yet, so the CLI refuses it rather than silently clipping highlights.
 2. Optimization compares graded source against reference in Oklab with quantile and moment matching, TV smoothness on the lattice, an identity prior, skin chroma and shadow luminance anchors, and a gamut penalty.
 3. The recovered lattice is blended by `strength` toward identity, clamped to `[0, 1]`, and written red-fastest per the IRIDAS/Adobe `.cube` subset.
 4. FFmpeg `lut3d` applies the same file for preview and export, so the in-app result matches DaVinci Resolve and Premiere Pro by construction.
