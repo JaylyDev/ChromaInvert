@@ -36,6 +36,18 @@ _SLOG_E = 95.0
 _SLOG_MID = 0.18
 _SLOG_OFF = 0.01
 
+_SGAMUT3CINE_TO_XYZ = np.array(
+    [
+        [0.5990839208, 0.2489255161, 0.1024464902],
+        [0.2150758201, 0.8850685017, -0.1001443219],
+        [-0.0320658495, -0.0276583907, 1.1487819910],
+    ]
+)
+_SGAMUT3CINE_TO_REC709 = _XYZ_TO_SRGB @ _SGAMUT3CINE_TO_XYZ
+
+_SLOG_WORKING_THRESHOLD = 0.9
+_SLOG_WORKING_SHOULDER = 0.15
+
 
 def srgb_to_linear(c: NDArray[np.floating]) -> NDArray[np.float64]:
     c = np.asarray(c, dtype=np.float64)
@@ -143,9 +155,40 @@ def decode_slog3(code: NDArray[np.floating]) -> NDArray[np.float64]:
     return np.where(y >= _SLOG_D / 1023.0, hi, lo)
 
 
+def sgamut3cine_to_rec709(rgb: NDArray[np.floating]) -> NDArray[np.float64]:
+    rgb = np.asarray(rgb, dtype=np.float64)
+    return rgb @ _SGAMUT3CINE_TO_REC709.T
+
+
+def linear_to_bounded(linear: NDArray[np.floating]) -> NDArray[np.float64]:
+    x = np.asarray(linear, dtype=np.float64)
+    x = np.maximum(x, 0.0)
+    above = x > _SLOG_WORKING_THRESHOLD
+    compressed = _SLOG_WORKING_THRESHOLD + (1.0 - _SLOG_WORKING_THRESHOLD) * (x - _SLOG_WORKING_THRESHOLD) / (
+        x - _SLOG_WORKING_THRESHOLD + _SLOG_WORKING_SHOULDER
+    )
+    return np.where(above, compressed, x)
+
+
+def bounded_to_linear(bounded: NDArray[np.floating]) -> NDArray[np.float64]:
+    y = np.asarray(bounded, dtype=np.float64)
+    y = np.clip(y, 0.0, 1.0 - 1e-12)
+    above = y > _SLOG_WORKING_THRESHOLD
+    a = (y - _SLOG_WORKING_THRESHOLD) / (1.0 - _SLOG_WORKING_THRESHOLD)
+    a = np.clip(a, 0.0, 1.0 - 1e-12)
+    x_above = _SLOG_WORKING_THRESHOLD + a * _SLOG_WORKING_SHOULDER / np.maximum(1.0 - a, 1e-12)
+    return np.where(above, x_above, y)
+
+
+def slog3_to_working_space(code: NDArray[np.floating]) -> NDArray[np.float64]:
+    linear_scene = decode_slog3(code)
+    rec709_linear = sgamut3cine_to_rec709(linear_scene)
+    return linear_to_bounded(rec709_linear)
+
+
 def decode_input(pixels: NDArray[np.floating], profile: str) -> NDArray[np.float64]:
     if profile == "rec709":
         return srgb_to_linear(pixels)
-    if profile == "slog3":
-        return decode_slog3(pixels)
+    if profile in ("slog3", "slog3_sgamut3cine", "slog3_sgamut3.cine", "slog3_sgamut3_cine"):
+        return slog3_to_working_space(pixels)
     raise ValueError(f"unknown input profile: {profile}")

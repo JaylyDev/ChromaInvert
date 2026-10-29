@@ -12,6 +12,8 @@ from chromainvert.color import decode_input
 from chromainvert.cube import CubeLut, identity_lattice, write_cube
 from chromainvert.optimize import OptimizeConfig, optimize_lut
 
+_ALLOWED_PROFILES = {"rec709", "slog3", "slog3_sgamut3cine", "slog3_sgamut3.cine", "slog3_sgamut3_cine"}
+
 
 def resolve(base: Path, p: str) -> Path:
     path = Path(p)
@@ -48,8 +50,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     job_path = Path(args.job)
     workdir = job_path.parent
     job = json.loads(job_path.read_text())
-    if job.get("contract_version") != 1:
-        raise ValueError("unsupported contract_version, expected 1")
+    contract_version = job.get("contract_version")
+    if contract_version not in (1, 2):
+        raise ValueError("unsupported contract_version, expected 1 or 2")
     for key in ("source_frames", "reference_frames", "output_cube", "report_json"):
         if key not in job:
             raise ValueError(f"job is missing required key: {key}")
@@ -62,8 +65,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         device=str(job.get("device", "auto")),
     )
     profile = str(job.get("input_profile", "rec709"))
-    if profile != "rec709":
-        raise ValueError(f"contract v1 supports rec709 only, got {profile}")
+    if profile not in _ALLOWED_PROFILES:
+        raise ValueError(f"unsupported input_profile {profile!r}, expected one of {sorted(_ALLOWED_PROFILES)}")
     strength = float(job.get("strength", 1.0))
     if not 0.0 <= strength <= 1.0:
         raise ValueError("strength must be in [0, 1]")
@@ -78,7 +81,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     lut = blend_toward_identity(lut, strength)
     cube_path = resolve(workdir, job["output_cube"])
     write_cube(cube_path, lut)
-    report["contract_version"] = 1
+    report["contract_version"] = contract_version
     report["input_profile"] = profile
     report["strength"] = strength
     report["versions"] = {"python": sys.version.split()[0], "numpy": np.__version__, "torch": torch.__version__}
