@@ -82,6 +82,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     lut, report = optimize_lut(source, reference, config, progress=progress)
     lut = blend_toward_identity(lut, strength)
+    lut.title = "ChromaInvert"
     cube_path = resolve(workdir, job["output_cube"])
     write_cube(cube_path, lut)
     report["contract_version"] = contract_version

@@ -18,3 +18,7 @@ Used by `scripts/run_demo.py` and `docs/DEMO_SCRIPT.md` for the dry run.
 
 Provenance: operator supplied test footage. License: all rights reserved by the
 footage owner, do not redistribute or commit to git.
+
+## Tracked samples
+
+- `assets/job.json.example`: ChromaInvert sample job (contract v1, rec709). Authored in repo, no license restriction.

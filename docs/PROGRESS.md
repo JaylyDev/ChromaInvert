@@ -180,4 +180,23 @@ Completed:
 - Added `is_probe_gate_pass` in `engine/chromainvert/benchmark.py`: absolute fallback now requires strict improvement over baseline; `run_benchmark` returns `probe_gate_pass`, `chart_gate_pass`, `benchmark_gate_pass`, and `heldout_gate_absolute`; unified `mean_de00` stride and validated `probe_count`.
 - `engine/chromainvert/cli.py` and `scripts/run_benchmark.py` exit on `benchmark_gate_pass`.
 - Reworked `engine/tests/test_deterministic_heldout.py` to exercise production paths: CPU repeat equality, gate helper pass and fail, probe seed forwarding, deterministic forwarding, and CLI wiring.
+## 2026-10-29: Feature, Real-footage CLI run and validation
+
+Completed:
+- Added `engine/chromainvert/__main__.py` so `python -m chromainvert` works.
+- Extracted 3 source frames from Rec709 clip `A001_10290006_C101.mov` into `work/frames/source/`.
+- Created warm graded reference frames `work/frames/reference/ref_001.png` and `ref_002.png`.
+- Added `assets/job.json.example` (tracked sample; contract v1, rec709, coarse 17, lut 33, 150 + 30 iters). The scratch `work/job.json` used for the live run is gitignored.
+- Added `scripts/validate_real_footage.py`: reads cube, checks size, finiteness, range, neighbor delta, title, domain, FFmpeg lut3d, DeltaE effect magnitude.
+- Set LUT title to `ChromaInvert` in `engine/chromainvert/cli.py` so exported cubes carry a non-empty title.
+- Added `scripts/extract_frames.py` and `scripts/run_real_footage.py` (frame extraction, job creation, run, validation, synthetic fallback).
+- Added `docs/DEMO_SCRIPT.md` and README real-footage quickstart.
+- Added `engine/tests/test_real_footage.py` (8-bit PNG handling, optimize + CLI smoke).
+
+Verified:
+- `python -m chromainvert run work/job.json`: done in 4.47s, `work/out.cube` (33), `work/report.json` (device cuda, clamped cube 0.0 to 1.0, max_neighbor_delta 0.1395).
+- `python scripts/validate_cube.py`: PASS.
+- `python scripts/validate_real_footage.py work/out.cube work/frames/source/source_001.png`: PASS (effect magnitude dE00 10.8139, informational).
+- `python scripts/run_benchmark.py`: improvement reported, no regression.
+- `python -m pytest engine/tests -q`: 49 passed.
 

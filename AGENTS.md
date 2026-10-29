@@ -22,7 +22,13 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `scripts/premiere_validation.py`: FFmpeg `lut3d` vs Python `DifferentiableLUT3D` comparison with tetrahedral gap check and optional Premiere still scoring.
 - `scripts/run_benchmark.py`: runs the synthetic benchmark and writes `work/benchmark.json`.
 - `scripts/run_demo.py`: demo dry run; extracts frames with FFmpeg, writes `work/demo/job.json`, runs the engine, grades a preview clip with `lut3d`, runs the synthetic benchmark, prints a timing table.
-- `docs/DEMO_SCRIPT.md`: 3 minute run-of-show with commands, timings, and failure lines.
+- `docs/DEMO_SCRIPT.md`: 3 minute run-of-show with commands, timings, and failure lines, plus the real-footage quickstart.
+- `scripts/validate_real_footage.py`: validates a real-footage cube (size, finiteness, range, neighbor delta, FFmpeg lut3d, informational effect-magnitude DeltaE).
+- `scripts/extract_frames.py`: extracts N frames from a video via FFmpeg.
+- `scripts/run_real_footage.py`: reusable driver for frame extraction, job creation, run, and validation with synthetic fallback.
+- `engine/tests/test_real_footage.py`: real-footage CLI and optimize smoke tests.
+- `engine/chromainvert/__main__.py`: enables `python -m chromainvert`.
+- `assets/job.json.example`: tracked sample job for the real-footage CLI run.
 - `docs/CHROMAINVERT_HACKATHON_PLAN.md`: full technical plan and team guide.
 - `docs/ARCHITECTURE.md`: engine contract v2, backwards compatible with v1 (`job.json` schema, stdout JSONL protocol, `report.json` fields, color pipeline).
 - `docs/PREMIERE_VALIDATION.md`: Premiere Pro MCP validation procedure, thresholds, and SampleFootage steps.
