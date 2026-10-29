@@ -36,6 +36,7 @@ _SLOG_E = 95.0
 _SLOG_MID = 0.18
 _SLOG_OFF = 0.01
 
+# Apple Log Profile specification constants.
 _APPLE_R0 = -0.05641088
 _APPLE_RT = 0.01
 _APPLE_C = 47.28711236
@@ -162,7 +163,8 @@ def decode_slog3(code: NDArray[np.floating]) -> NDArray[np.float64]:
 def encode_apple_log(reflection: NDArray[np.floating]) -> NDArray[np.float64]:
     x = np.asarray(reflection, dtype=np.float64)
     quad = _APPLE_C * (x - _APPLE_R0) ** 2
-    log = _APPLE_GAMMA * np.log2(x + _APPLE_BETA) + _APPLE_DELTA
+    with np.errstate(invalid="ignore", divide="ignore"):
+        log = _APPLE_GAMMA * np.log2(x + _APPLE_BETA) + _APPLE_DELTA
     return np.where(x < _APPLE_R0, 0.0, np.where(x < _APPLE_RT, quad, log))
 
 
