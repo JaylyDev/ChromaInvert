@@ -1,5 +1,3 @@
-import os
-import random
 import time
 
 import numpy as np
@@ -103,7 +101,7 @@ def heldout_probe_metrics(
     probe: NDArray[np.floating],
     truth_lattice: NDArray[np.floating],
     recovered_lattice: NDArray[np.floating],
-) -> dict:
+) -> dict[str, float]:
     probe_arr = np.asarray(probe, dtype=np.float32).reshape(-1, 3)
     truth_probe = apply_lut(probe_arr[:, None, :], truth_lattice).reshape(-1, 3)
     recovered_probe = apply_lut(probe_arr[:, None, :], recovered_lattice).reshape(-1, 3)
