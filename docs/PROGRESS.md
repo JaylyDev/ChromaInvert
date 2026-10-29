@@ -1,5 +1,22 @@
 # ChromaInvert Progress Log
 
+## 2026-10-29: Fix, premiere_validation council review
+
+Completed:
+- Fixed `de00_stats` in `scripts/premiere_validation.py` to decode sRGB before CIE Lab, so the reported numbers are real DeltaE2000 instead of a gamma-distorted metric.
+- Re-read the written source and Python-graded PNGs so all three renders share identical 8-bit quantization, removing representation bias from the gate.
+- Made `rgb_stats` emit a finite PSNR (99.0 dB sentinel for identical images) and serialized the report with `allow_nan=False`.
+- Added shape and emptiness validation in `de00_stats`, `rgb_stats`, and `compare_pair`, with a graceful FAIL report for mismatched Premiere stills.
+- Rejected cubes with non-default `DOMAIN_MIN`/`DOMAIN_MAX` and missing `ffmpeg` with a clear FAIL instead of a traceback.
+- Aligned the Premiere threshold comparison with the docs ("under 2.0") and marked reports/runs where Premiere was not actually tested.
+- Softened the tetrahedral claim in `docs/PREMIERE_VALIDATION.md` to a stated proxy assumption and added an end-to-end command using an engine-generated cube.
+- Added `engine/tests/test_premiere_validation.py` (6 tests, including an FFmpeg integration test).
+
+Verified:
+- `python -m pytest engine/tests -q`: 52 passed.
+- `python scripts/validate_cube.py`: PASS.
+- `python scripts/premiere_validation.py` on synthetic chart: PASS (python vs trilinear mean 0.224; tetrahedral gap mean 0.007, max 1.079).
+
 ## 2026-10-29: Fix, harden premiere_validation I/O
 
 Completed:

@@ -8,7 +8,7 @@ Acceptance test for issue 4: the exported `.cube` grades the same inside Premier
 
 1. Python `DifferentiableLUT3D` (trilinear, the optimization path).
 2. FFmpeg `lut3d` with `interp=trilinear` (expected to match Python closely).
-3. FFmpeg `lut3d` with `interp=tetrahedral` (the FFmpeg default; Premiere Pro and DaVinci Resolve evaluate LUTs this way).
+3. FFmpeg `lut3d` with `interp=tetrahedral` (FFmpeg default; used as a proxy for Premiere Pro and DaVinci Resolve, which are assumed to evaluate LUTs tetrahedrally; this is an unversioned assumption and must be confirmed with a real exported still).
 
 A fourth optional comparison takes a still exported from Premiere and compares it against the FFmpeg tetrahedral render of the same source and cube.
 
@@ -17,7 +17,7 @@ Metrics per pair: mean, p50, p95, max DeltaE2000 plus mean and max absolute RGB 
 ## Thresholds
 
 - Python vs FFmpeg trilinear: mean DeltaE2000 at or under 1.0. Larger values mean an axis-order, range, or quantization bug, not interpolation.
-- Premiere still vs FFmpeg tetrahedral: mean DeltaE2000 under 2.0 (hackathon plan Section 11 cross-tool agreement).
+- Premiere still vs FFmpeg tetrahedral: mean DeltaE2000 under 2.0 (hackathon plan Section 11 cross-tool agreement). A run without `--premiere-still` reports FFmpeg/Python agreement only and is not Premiere evidence.
 - Trilinear vs tetrahedral gap is reported, not gated. Typical smooth photo grades show a mean gap well under 1.0 with isolated saturated colors reaching higher. Record the numbers; only fine-tune under a tetrahedral approximation if the gap is visible on real footage.
 
 ## Run
@@ -38,6 +38,13 @@ With a Premiere exported still (same source frame, same cube applied in Premiere
 
 ```
 python scripts/premiere_validation.py --cube work/out.cube --source work/src_frame.png --premiere-still work/premiere_still.png
+```
+
+For a meaningful end-to-end check, pass a cube produced by the engine rather than the synthetic default:
+
+```
+python -m chromainvert run work/job.json
+python scripts/premiere_validation.py --cube work/out.cube --source work/src_frame.png
 ```
 
 JSON report defaults to `work/premiere_validation.json`. Exit code 0 means PASS, 1 means FAIL. Console prints one line per pair plus the tetrahedral gap line.
@@ -72,5 +79,5 @@ If the MCP is flaky or version mismatched, drop to the manual checklist immediat
 ## Failure triage
 
 - Python vs trilinear FAIL: check cube axis order (red fastest), `DOMAIN_MIN` or `DOMAIN_MAX` lines, 8-bit PNG rounding on gradients, and that the source PNG written by the script is the file FFmpeg read.
-- Tetrahedral gap large: expected on high-chroma edges; inspect the max-ΔE pixels before changing the optimizer.
+- Tetrahedral gap large: expected on high-chroma edges; inspect the max dE00 pixels before changing the optimizer.
 - Premiere FAIL with FFmpeg-internal pairs green: suspect Premiere input-range interpretation or Lumetri normalization settings first, then re-export with explicit Rec.709 tags.
