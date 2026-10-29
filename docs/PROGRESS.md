@@ -67,6 +67,19 @@ Verified:
 - FFmpeg probe and frame extraction validated on sample footage.
 - lut3d preview encode validated on extracted cube.
 
+## 2026-10-29: Review follow-up, Wonder findings on FFmpeg decode link (Issue #10)
+
+Completed:
+- Applied the Muse Wonder council review (verdict: changes requested, 17 findings) as follow-up fixes on top of PR #22.
+- `scripts/ffmpeg_helpers.py`: lut3d path escaping for Windows drive colons and quotes, output existence checks after every extraction and grab, fps fallback when `avg_frame_rate` is `0/0`, explicit `rgb24` 8-bit fallback only for pixel format errors, `sys.executable` plus `PYTHONPATH` for the engine subprocess, stderr redirected to a temp file to avoid pipe deadlock, temp job and stderr cleanup on all wait paths, nonzero CLI exit on failed preview or run, job-relative path resolution for the `run` subcommand, strict ffprobe JSON errors with timeouts.
+- `app/`: `JobRunner` now writes `contract_version` 1 with `fine_iterations` and `device` and drops invented keys; JSON string escaping for all interpolated paths; engine command quoted with separate stderr capture, `done` event required for success, elapsed timeout surfaced; `cancel` no longer kills every Python process. `Ffmpeg` drops the Unix `head` pipe, checks ffprobe exit status and video stream presence, verifies output files are non-empty, escapes lut3d filter paths, rejects unsafe path characters. `main` validates probe and frames, checks job write, gates preview on an existing cube, returns nonzero on failure. `Preview` validates inputs and only assigns output on success.
+- Known limits kept for the prototype: C++ `runEngine` still streams progress only after exit (Level 1 `std::system` design) and timeout is surfaced from elapsed time rather than a process kill; full `CreateProcess` job control is future work.
+
+Verified:
+- `python -m pytest engine/tests -q`: 46 passed.
+- `python scripts/validate_cube.py`: PASS.
+- CMake Release build green; `chromainvert_app.exe` with no args exits 0, with a missing file exits 1 with `ffprobe failed`; helper `probe` on a missing file exits 1 with a clear error.
+
 ## 2026-10-29: Fix, FFmpeg decode host crash and runner contract (Issue #10)
 
 Completed:

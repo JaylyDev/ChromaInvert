@@ -17,6 +17,8 @@ endif()
 if(NOT FFPROBE_EXECUTABLE)
     message(WARNING "ffprobe not found on PATH; install FFmpeg before running")
 endif()
+# Level 1 resolves ffmpeg and ffprobe from PATH at runtime; the checks above
+# are configure-time hints only.
 
 add_executable(chromainvert_app
     src/main.cpp
