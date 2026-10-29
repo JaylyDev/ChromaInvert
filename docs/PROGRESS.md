@@ -1,5 +1,19 @@
 # ChromaInvert Progress Log
 
+## 2026-10-29: Feature, Premiere Pro validation run
+
+Completed:
+- Added `scripts/premiere_validation.py`: grades one source three ways (Python `DifferentiableLUT3D` trilinear, FFmpeg `lut3d` trilinear, FFmpeg `lut3d` tetrahedral), scores each pair with mean/p50/p95/max DeltaE2000 plus RGB diff and PSNR, and optionally scores a Premiere exported still against the FFmpeg tetrahedral render. Writes `work/premiere_validation.json`, exits 0 on PASS.
+- Added `docs/PREMIERE_VALIDATION.md`: thresholds (Python vs trilinear mean at or under 1.0; Premiere vs FFmpeg tetrahedral under 2.0), synthetic and SampleFootage run commands, MCP test steps with manual fallback, failure triage.
+- Recorded both files under Parts of the project in `AGENTS.md`.
+
+Verified:
+- `python -m pytest engine/tests -q`: 46 passed.
+- `python scripts/validate_cube.py`: PASS.
+- `python scripts/premiere_validation.py` on synthetic chart: PASS (python vs trilinear mean 0.232; tetrahedral gap mean 0.008, max 1.973).
+- Same script on Rec.709 SampleFootage frame (`A001_10290006_C101.mov` at 1s): PASS (python vs trilinear mean 0.258; tetrahedral gap mean 0.015, max 1.897).
+- Identity cube plus FFmpeg tetrahedral output as `--premiere-still`: PASS (premiere pair mean 0.000).
+
 ## 2026-10-27: CI, GitHub Actions test workflow
 
 Completed:
