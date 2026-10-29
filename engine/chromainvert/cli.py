@@ -47,7 +47,7 @@ def blend_toward_identity(lut: CubeLut, strength: float) -> CubeLut:
 def cmd_run(args: argparse.Namespace) -> int:
     job_path = Path(args.job)
     workdir = job_path.parent
-    job = json.loads(job_path.read_text())
+    job = json.loads(job_path.read_text(encoding="utf-8"))
     if job.get("contract_version") != 1:
         raise ValueError("unsupported contract_version, expected 1")
     for key in ("source_frames", "reference_frames", "output_cube", "report_json"):
@@ -57,7 +57,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         coarse_size=int(job.get("coarse_size", 17)),
         fine_size=int(job.get("lut_size", 33)),
         iterations=int(job.get("iterations", 400)),
-        fine_iterations=int(job.get("fine_iterations", 20)),
+        fine_iterations=int(job.get("fine_iterations", 30)),
         seed=int(job.get("seed", 42)),
         device=str(job.get("device", "auto")),
     )
