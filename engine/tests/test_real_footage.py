@@ -3,7 +3,6 @@ from pathlib import Path
 
 import imageio.v2 as imageio
 import numpy as np
-import pytest
 
 from chromainvert.cli import cmd_run, load_frames
 from chromainvert.cube import read_cube, write_cube
@@ -81,6 +80,41 @@ def test_cli_real_footage_run(tmp_path):
     assert cmd_run(args) == 0
     cube = read_cube(tmp_path / "out.cube")
     assert cube.size == 7
+    assert cube.title == "ChromaInvert"
     assert np.all(np.isfinite(cube.lattice))
     assert 0.0 <= float(cube.lattice.min()) <= 1.0
     assert 0.0 <= float(cube.lattice.max()) <= 1.0
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert report["contract_version"] == 1
+    assert report["input_profile"] == "rec709"
+
+
+def test_python_m_chromainvert_run(tmp_path):
+    _write_images(tmp_path)
+    job = {
+        "contract_version": 1,
+        "source_frames": ["src.png"],
+        "reference_frames": ["ref.png"],
+        "input_profile": "rec709",
+        "coarse_size": 5,
+        "lut_size": 7,
+        "iterations": 10,
+        "fine_iterations": 5,
+        "strength": 1.0,
+        "seed": 1,
+        "device": "cpu",
+        "output_cube": "out.cube",
+        "report_json": "report.json",
+    }
+    (tmp_path / "job.json").write_text(json.dumps(job))
+    import subprocess
+    import sys
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "chromainvert", "run", str(tmp_path / "job.json")],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0
+    assert (tmp_path / "out.cube").exists()
+    assert read_cube(tmp_path / "out.cube").title == "ChromaInvert"
