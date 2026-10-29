@@ -77,9 +77,9 @@ Completed:
 - Added `engine/tests/test_real_footage.py` (8-bit PNG handling, optimize + CLI smoke).
 
 Verified:
-- `python -m chromainvert run work/job.json`: done in 3.67s, `work/out.cube` (33), `work/report.json` (device cuda, lattice_min 0.0, lattice_max 1.0, max_neighbor_delta 0.1357).
+- `python -m chromainvert run work/job.json`: done in 4.47s, `work/out.cube` (33), `work/report.json` (device cuda, clamped cube 0.0 to 1.0, max_neighbor_delta 0.1395).
 - `python scripts/validate_cube.py`: PASS.
-- `python scripts/validate_real_footage.py work/out.cube work/frames/source/source_001.png`: PASS (effect magnitude dE00 11.0174, informational).
+- `python scripts/validate_real_footage.py work/out.cube work/frames/source/source_001.png`: PASS (effect magnitude dE00 10.8139, informational).
 - `python scripts/run_benchmark.py`: improvement reported, no regression.
 - `python -m pytest engine/tests -q`: 49 passed.
 
