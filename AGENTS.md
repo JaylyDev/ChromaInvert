@@ -17,7 +17,9 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `engine/chromainvert/optimize.py`: Adam optimization loop with seeded pixel sampling, the `OptimizeConfig` weights, and the `deterministic` GPU mode flag.
 - `engine/chromainvert/cli.py`: `chromainvert run job.json` and `chromainvert benchmark` entry points.
 - `engine/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000) plus the seeded random-RGB probe heldout gate.
-- `app/`: C++ desktop host skeleton (FFmpeg pipeline, preview UI). Not yet implemented.
+- `app/CMakeLists.txt`, `app/src/main.cpp`, `app/src/MainWindow.*`, `app/src/JobRunner.*`: Win32 desktop host skeleton (file pickers, Match and Cancel, progress bar, log pane). JobRunner writes `job.json`, spawns the engine, parses stdout JSONL progress. Qt port is a follow-up per `docs/GUI_DECISION.md`.
+- `app/README.md`: Windows build and run steps for the desktop host.
+- `docs/GUI_DECISION.md`: Qt 6 versus ImGui framework decision (Qt 6 is the product target, Win32 host ships now).
 - `scripts/validate_cube.py`: FFmpeg `lut3d` acceptance check for exported cubes.
 - `scripts/premiere_validation.py`: FFmpeg `lut3d` vs Python `DifferentiableLUT3D` comparison with tetrahedral gap check and optional Premiere still scoring.
 - `scripts/run_benchmark.py`: runs the synthetic benchmark and writes `work/benchmark.json`.
@@ -34,7 +36,7 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `docs/PREMIERE_VALIDATION.md`: Premiere Pro MCP validation procedure, thresholds, and SampleFootage steps.
 - `docs/PROGRESS.md`: timestamped build log, updated with every feature.
 - `engine/tests/test_*.py`: one test module per engine module above; update both together.
-- `.github/workflows/tests.yml`: CI workflow running `python -m pytest engine/tests -q` on push and pull request.
+- `.github/workflows/tests.yml`: CI workflow running `python -m pytest engine/tests -q` on Ubuntu plus an MSVC Release build of `app` on Windows, on push and pull request.
 
 ## Build and run
 

@@ -82,6 +82,44 @@ Next steps:
 - Same script on Rec.709 SampleFootage frame (`A001_10290006_C101.mov` at 1s): PASS (python vs trilinear mean 0.258; tetrahedral gap mean 0.015, max 1.897).
 - Identity cube plus FFmpeg tetrahedral output as `--premiere-still`: PASS (premiere pair mean 0.000).
 
+## 2026-10-29: Wonder re-review fixes for the GUI host
+
+Completed:
+- Added `engine/chromainvert/__main__.py` so the `python -m chromainvert run` command that `JobRunner` spawns works on this branch (already present on main via the real-footage work).
+- Added `WS_TABSTOP` to the interactive `MainWindow` controls so the `IsDialogMessageW` keyboard navigation actually moves focus between fields.
+- Dropped the pinned Visual Studio 17 2022 generator from the `build-windows` CI job: current `windows-latest` runners ship Visual Studio 2026 only, so CMake now selects the default MSVC generator.
+
+Verified:
+- MSVC 19.44 Release and MinGW-w64 GCC 13.2 builds clean with zero compiler warnings; window-handle smoke passed for both executables (title `ChromaInvert`, graceful exit code 0).
+- `JobRunner` harness against a Unicode output directory (accented and CJK characters): exactly one `WM_JOB_DONE` on success (exit code 0, `.cube` and report written, ASCII-only `job.json`, strength round-trips) and exactly one on cancel (`Cancelled.`, no orphan engine process).
+- `python -m pytest engine/tests -q`: 46 passed. `python scripts/validate_cube.py`: PASS. Workflow YAML parses.
+
+## 2026-10-29: Wonder review findings on the GUI host
+
+Completed:
+- Addressed the independent Muse Wonder review of PR #24 (verdict: changes requested): reworked `JobRunner` process and thread ownership (atomic child handle, sole-owner close, prior thread reaped before reuse, exactly one terminal `WM_JOB_DONE` posted after the child is waited on), ASCII-safe `job.json` emission with wide-path file open, strength validation clamped to `[0, 1]` with empty and non-finite rejection, absolute path canonicalization, done summary from the known output path, failed-post cleanup, `hwnd_` set at `WM_NCCREATE`, dialog keyboard navigation with tri-state `GetMessage`, child-window creation checks, directory rejection, round-trippable strength formatting, final partial-line drain, MinGW `-municode` plus `WINVER` defines with brace struct init, system DPI awareness until layout scaling lands, corrected `docs/GUI_DECISION.md` claims, and a Windows MSVC build job in CI.
+- Aligned the engine with the contract: `cli.py` reads the job file as UTF-8 and the omitted-key `fine_iterations` fallback is 30, matching `ARCHITECTURE.md` and `OptimizeConfig`.
+
+Verified:
+- MSVC 19.44 Release clean with zero warnings; pytest 46 passed.
+- Pending rerun of the exe window-handle smoke and the FFmpeg acceptance checks before merge.
+
+## 2026-10-29: GUI framework decision and Win32 main window skeleton
+
+Completed:
+- Added `docs/GUI_DECISION.md`: Qt 6 versus ImGui decision. Qt 6 is the product target; ImGui is the runner-up for scopes work. The shippable milestone is a native Win32 host with zero third party GUI deps, and the Qt port reuses the same `job.json` contract later.
+- Added `app/CMakeLists.txt`, `app/src/main.cpp`, `app/src/MainWindow.h`, `app/src/MainWindow.cpp`, `app/src/JobRunner.h`, `app/src/JobRunner.cpp`, `app/README.md`: main window with source and reference file pickers, output `.cube` picker, Strength edit, LUT size and device combos, Match and Cancel buttons, progress bar, status label, and log pane. JobRunner writes `job.json` (contract v1), spawns `python -m chromainvert run`, and parses stdout JSONL into progress and done messages. Removed obsolete `app/.gitkeep`.
+- Recorded the new files under Parts of the project in `AGENTS.md`.
+
+Verified:
+- `cmake -B build -S app -G "Visual Studio 17 2022" -A x64` plus `cmake --build build --config Release`: clean build with MSVC 19.44, zero warnings, `build/Release/ChromaInvert.exe` launches and shows its main window.
+- `python -m pytest engine/tests -q`: 46 passed.
+- `python scripts/validate_cube.py`: PASS.
+- SampleFootage end to end on the JobRunner contract path: ffprobe confirms the Rec709 clip is BT.709 limited range, extracted source and reference frames, ran the engine (100 plus 10 iterations, GPU, 3.7 s) to `{"event": "done"}` with a valid `.cube`, and applied it with FFmpeg `lut3d`.
+
+Notes:
+- The skeleton grades still frames only; video decoding and frame sampling belong to issue #10 and scopes belong to issue #11, so no preview or scopes code was added here.
+- The AGENTS.md council review step was skipped: child agents cannot spawn subagents, so a careful self review (warnings clean, tests green, contract fields cross checked against `cli.py`) stands in for it.
 
 ## 2026-10-27: CI, GitHub Actions test workflow
 
