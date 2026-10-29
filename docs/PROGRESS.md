@@ -62,4 +62,17 @@ Completed:
 Verified:
 - `python -m pytest engine/tests -q`: 5 passed (round trip at sizes 2, 17, 33, axis order, domain, rejection of bad files, writer validation).
 - `python scripts/validate_cube.py`: PASS. Identity 33 LUT applied with FFmpeg `lut3d` gives pixel-identical output (peak diff 0.0). Channel-swap LUT turns pure red into blue, confirming lattice axis order matches FFmpeg.
+## 2026-10-29: Feature, deterministic GPU mode and random-RGB probe heldout gate
+
+Completed:
+- Added `deterministic: bool = False` to `OptimizeConfig` and `enable_deterministic(seed)` in `engine/chromainvert/optimize.py`: sets `CUBLAS_WORKSPACE_CONFIG`, toggles torch deterministic algorithms and cuDNN flags, returns status dict.
+- `optimize_lut` seeds torch/numpy/python/random/cuda when deterministic, records `deterministic` and `variance_note` in report.
+- Added `random_rgb_probe`, `heldout_probe_metrics`, `mean_de00_full` to `engine/chromainvert/benchmark.py`; `run_benchmark` now accepts `deterministic`, `probe_count`, `probe_seed` and returns probe metrics plus `heldout_gate_pass`.
+- CLI `run` reads `deterministic` from job.json; `benchmark` gains `--deterministic`, `--probe-count`, `--probe-seed`; gates on both chart and probe improvement.
+- `scripts/run_benchmark.py` forwards the new flags.
+- Added `engine/tests/test_deterministic_heldout.py`.
+
+Verified:
+- `python -m pytest engine/tests -q`: 55 passed.
+- Deterministic GPU mode uses `torch.use_deterministic_algorithms(True, warn_only=True)` because the 3D LUT `grid_sample` backward has no deterministic CUDA kernel; cuDNN benchmarking disabled.
 

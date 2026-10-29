@@ -27,6 +27,7 @@ app --reads--> work/out.cube --applies--> FFmpeg lut3d preview and encode
 | `strength` | float | 1.0 | blend of recovered LUT toward identity |
 | `seed` | int | 42 | deterministic pixel sampling |
 | `device` | str | `auto` | `auto`, `cuda`, or `cpu` |
+| `deterministic` | bool | `false` | enable deterministic GPU mode |
 | `output_cube` | str | required | exported `.cube` path |
 | `report_json` | str | required | metrics report path |
 
@@ -42,6 +43,12 @@ Failure is a nonzero exit with no `done` line and diagnostics on stderr. Hosts t
 ## report.json
 
 Final loss terms per name, `device` actually used, `seconds`, lattice stats (`lattice_min`, `lattice_max`, `max_neighbor_delta`), pixel counts, and library versions.
+
+## Deterministic mode and variance note
+
+GPU nondeterminism from `grid_sample` backward atomic adds and quantile ties on flat chart patches causes a 4-5 percent spread in improvement without deterministic mode (observed 41.9 to 46.2 percent, baseline 4.04 to recovered 2.17-2.35 mean DeltaE2000 across runs). CPU runs are deterministic by default.
+
+Deterministic mode is enabled via `job.json` with `deterministic: true` or the CLI `--deterministic` flag. It sets `CUBLAS_WORKSPACE_CONFIG=:4096:8` and calls `torch.use_deterministic_algorithms(True, warn_only=True)` (warn_only because the 3D LUT `grid_sample` backward has no deterministic CUDA kernel in current PyTorch), and disables cuDNN benchmarking. Performance tradeoff is a 10-30 percent slowdown. The report includes `deterministic` and a `variance_note` field describing this behavior.
 
 ## Color pipeline
 

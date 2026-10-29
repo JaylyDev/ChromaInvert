@@ -1,3 +1,5 @@
+import os
+import random
 import time
 
 import numpy as np
@@ -86,6 +88,35 @@ def mean_de00(a: NDArray[np.floating], b: NDArray[np.floating]) -> float:
     return float(delta_e_2000(linear_srgb_to_lab(a), linear_srgb_to_lab(b)).mean())
 
 
+def mean_de00_full(a: NDArray[np.floating], b: NDArray[np.floating]) -> float:
+    a = np.asarray(a).reshape(-1, 3)
+    b = np.asarray(b).reshape(-1, 3)
+    return float(delta_e_2000(linear_srgb_to_lab(a), linear_srgb_to_lab(b)).mean())
+
+
+def random_rgb_probe(n: int = 10000, seed: int = 99) -> NDArray[np.float32]:
+    rng = np.random.default_rng(seed)
+    return np.ascontiguousarray(rng.uniform(0.0, 1.0, size=(n, 3)), dtype=np.float32)
+
+
+def heldout_probe_metrics(
+    probe: NDArray[np.floating],
+    truth_lattice: NDArray[np.floating],
+    recovered_lattice: NDArray[np.floating],
+) -> dict:
+    probe_arr = np.asarray(probe, dtype=np.float32).reshape(-1, 3)
+    truth_probe = apply_lut(probe_arr[:, None, :], truth_lattice).reshape(-1, 3)
+    recovered_probe = apply_lut(probe_arr[:, None, :], recovered_lattice).reshape(-1, 3)
+    baseline = mean_de00_full(truth_probe, probe_arr)
+    recovered_de = mean_de00_full(truth_probe, recovered_probe)
+    improvement = (baseline - recovered_de) / baseline if baseline > 0 else 0.0
+    return {
+        "baseline_probe_de00": baseline,
+        "recovered_probe_de00": recovered_de,
+        "improvement_probe": improvement,
+    }
+
+
 def run_benchmark(
     coarse_size: int = 17,
     fine_size: int = 33,
@@ -94,6 +125,9 @@ def run_benchmark(
     seed: int = 123,
     device: str = "auto",
     pixel_budget: int = 65536,
+    deterministic: bool = False,
+    probe_count: int = 10000,
+    probe_seed: int | None = None,
 ) -> dict:
     started = time.monotonic()
     chart = make_chart(seed=seed)
@@ -102,6 +136,8 @@ def run_benchmark(
     source = chart
     truth = CubeLut(size=33, lattice=commercial_style_lattice(33).astype(np.float32))
     reference = apply_lut(other, truth.lattice)
+    if probe_seed is None:
+        probe_seed = seed + 100
     config = OptimizeConfig(
         coarse_size=coarse_size,
         fine_size=fine_size,
@@ -110,6 +146,7 @@ def run_benchmark(
         seed=seed,
         device=device,
         pixel_budget=pixel_budget,
+        deterministic=deterministic,
     )
     lut, report = optimize_lut([source], [reference], config)
     graded_heldout = apply_lut(heldout, lut.lattice)
@@ -117,6 +154,12 @@ def run_benchmark(
     baseline = mean_de00(truth_heldout, heldout)
     recovered = mean_de00(truth_heldout, graded_heldout)
     rmse = float(np.sqrt(np.mean((truth_heldout - graded_heldout) ** 2)))
+    probe = random_rgb_probe(probe_count, probe_seed)
+    probe_metrics = heldout_probe_metrics(probe, truth.lattice, lut.lattice)
+    baseline_probe = probe_metrics["baseline_probe_de00"]
+    recovered_probe = probe_metrics["recovered_probe_de00"]
+    improvement_probe = probe_metrics["improvement_probe"]
+    heldout_gate_pass = bool(improvement_probe >= 0.4 or recovered_probe < 3.0)
     return {
         "seed": seed,
         "coarse_size": coarse_size,
@@ -129,4 +172,11 @@ def run_benchmark(
         "heldout_psnr": 20.0 * np.log10(1.0 / rmse) if rmse > 0 else float("inf"),
         "seconds": time.monotonic() - started,
         "optimizer_report": report,
+        "baseline_probe_de00": baseline_probe,
+        "recovered_probe_de00": recovered_probe,
+        "improvement_probe": improvement_probe,
+        "probe_count": probe_count,
+        "probe_seed": probe_seed,
+        "heldout_gate_pass": heldout_gate_pass,
+        "heldout_gate_threshold": 0.4,
     }

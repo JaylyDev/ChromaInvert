@@ -60,6 +60,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         fine_iterations=int(job.get("fine_iterations", 20)),
         seed=int(job.get("seed", 42)),
         device=str(job.get("device", "auto")),
+        deterministic=bool(job.get("deterministic", False)),
     )
     profile = str(job.get("input_profile", "rec709"))
     if profile != "rec709":
@@ -98,6 +99,9 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
         seed=args.seed,
         device=args.device,
         pixel_budget=args.pixels,
+        deterministic=bool(getattr(args, "deterministic", False)),
+        probe_count=int(getattr(args, "probe_count", 10000)),
+        probe_seed=getattr(args, "probe_seed", None),
     )
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -105,8 +109,14 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     print(f"baseline held-out mean dE00: {metrics['baseline_heldout_de00']:.3f}")
     print(f"recovered held-out mean dE00: {metrics['recovered_heldout_de00']:.3f}")
     print(f"improvement: {100.0 * metrics['improvement_heldout']:.1f}%")
+    print(f"baseline probe dE00: {metrics['baseline_probe_de00']:.3f}")
+    print(f"recovered probe dE00: {metrics['recovered_probe_de00']:.3f}")
+    print(f"probe improvement: {100.0 * metrics['improvement_probe']:.1f}%")
+    print(f"probe gate: {'PASS' if metrics['heldout_gate_pass'] else 'FAIL'}")
     print(f"seconds: {metrics['seconds']:.1f}")
-    return 0 if metrics["improvement_heldout"] >= 0.4 else 1
+    chart_pass = metrics["improvement_heldout"] >= 0.4
+    probe_pass = bool(metrics["heldout_gate_pass"])
+    return 0 if (chart_pass and probe_pass) else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -124,6 +134,9 @@ def main(argv: list[str] | None = None) -> int:
     p_bench.add_argument("--seed", type=int, default=123)
     p_bench.add_argument("--device", default="auto")
     p_bench.add_argument("--pixels", type=int, default=65536)
+    p_bench.add_argument("--deterministic", action="store_true")
+    p_bench.add_argument("--probe-count", type=int, default=10000, dest="probe_count")
+    p_bench.add_argument("--probe-seed", type=int, default=None, dest="probe_seed")
     p_bench.set_defaults(func=cmd_benchmark)
     parsed = parser.parse_args(argv)
     return parsed.func(parsed)
