@@ -1,5 +1,18 @@
 # ChromaInvert Progress Log
 
+## 2026-10-29: Bounded S-Log3 working space (issue 6)
+
+Completed:
+- Added bounded S-Log3/S-Gamut3.Cine working space in `engine/chromainvert/color.py`: `decode_slog3` to scene linear, `sgamut3cine_to_rec709` matrix to Rec.709 linear, then `linear_to_bounded` soft highlight compression (identity at 0.9 and below, smooth shoulder to 1.0 above) so optimization stays in `[0, 1]` with no hard clipping. `bounded_to_linear` provides the documented inverse for preview or debugging.
+- `decode_input` accepts `slog3` plus `slog3_sgamut3cine`, `slog3_sgamut3.cine`, and `slog3_sgamut3_cine` aliases; `cli.py` accepts contract versions 1 and 2 and the same profiles, recording both in `report.json`.
+- Updated `docs/ARCHITECTURE.md` to contract v2 with the working-space math, full-range versus limited-range note, and the S-Log3 preview pipeline.
+- Added unit tests on known curve values (0.18 maps to 420/1023 code, 0.9 to 598/1023, 1.0 code to about 38.4 linear), neutral gamut preservation, bounded monotonicity and invertibility, alias equivalence, CLI acceptance, and v1 backwards compatibility.
+
+Verified:
+- `python -m pytest engine/tests -q`: 59 passed.
+- `python scripts/validate_cube.py`: PASS.
+- Real S-Log3 footage (`Slog3 -proress 444.mov` frame via FFmpeg `gbrp16le` TIFF): unbounded decode peaked at 2.39 linear, bounded working space decodes to [0.02, 0.99]; end-to-end `slog3` job (contract 2) emits progress and done events plus `out.cube` and `report.json`.
+
 ## 2026-10-29: Demo script and dry run
 
 Completed:

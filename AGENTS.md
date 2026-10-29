@@ -23,7 +23,7 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `scripts/run_demo.py`: demo dry run; extracts frames with FFmpeg, writes `work/demo/job.json`, runs the engine, grades a preview clip with `lut3d`, runs the synthetic benchmark, prints a timing table.
 - `docs/DEMO_SCRIPT.md`: 3 minute run-of-show with commands, timings, and failure lines.
 - `docs/CHROMAINVERT_HACKATHON_PLAN.md`: full technical plan and team guide.
-- `docs/ARCHITECTURE.md`: engine contract v1 (`job.json` schema, stdout JSONL protocol, `report.json` fields, color pipeline).
+- `docs/ARCHITECTURE.md`: engine contract v2, backwards compatible with v1 (`job.json` schema, stdout JSONL protocol, `report.json` fields, color pipeline).
 - `docs/PROGRESS.md`: timestamped build log, updated with every feature.
 - `engine/tests/test_*.py`: one test module per engine module above; update both together.
 - `.github/workflows/tests.yml`: CI workflow running `python -m pytest engine/tests -q` on push and pull request.

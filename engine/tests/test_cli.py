@@ -22,6 +22,20 @@ def test_load_frames_uint16_and_grayscale(tmp_path):
     np.testing.assert_allclose(frames[1][..., 0], frames[1][..., 1], atol=0.0)
 
 
+def test_load_frames_slog3_bounded(tmp_path):
+    code = (np.array([420.0 / 1023.0, 598.0 / 1023.0, 1.0]) * 255).astype(np.uint8)
+    img = np.tile(code.reshape(1, 1, 3), (4, 4, 1))
+    imageio.imwrite(tmp_path / "slog3.png", img)
+    frames = load_frames(["slog3.png"], "slog3", tmp_path)
+    assert frames[0].shape == (4, 4, 3)
+    assert bool(np.all(frames[0] >= 0.0))
+    assert bool(np.all(frames[0] <= 1.0))
+    assert bool(np.all(np.isfinite(frames[0])))
+    assert frames[0][0, 0, 0] < 0.3
+    assert frames[0][0, 0, 2] > 0.9
+    assert frames[0][0, 0, 2] < 1.0
+
+
 def test_load_frames_rejects_bad_shapes(tmp_path):
     flat = np.zeros((16, 16, 2), dtype=np.uint8)
     imageio.imwrite(tmp_path / "bad.png", flat)
@@ -44,7 +58,7 @@ def write_job(tmp_path, **overrides):
     imageio.imwrite(tmp_path / "src.png", image)
     imageio.imwrite(tmp_path / "ref.png", image)
     job = {
-        "contract_version": 1,
+        "contract_version": 2,
         "source_frames": ["src.png"],
         "reference_frames": ["ref.png"],
         "iterations": 1,
@@ -71,9 +85,57 @@ def test_run_rejects_bad_strength_before_work(tmp_path):
     assert not (tmp_path / "out.cube").exists()
 
 
-def test_run_rejects_slog3(tmp_path):
+def test_run_rejects_unknown_profile(tmp_path):
+    import argparse
+
+    args = argparse.Namespace(job=str(write_job(tmp_path, input_profile="vlog")))
+    with pytest.raises(ValueError):
+        cmd_run(args)
+
+
+def test_run_accepts_slog3(tmp_path):
     import argparse
 
     args = argparse.Namespace(job=str(write_job(tmp_path, input_profile="slog3")))
+    cmd_run(args)
+    assert (tmp_path / "out.cube").exists()
+    assert (tmp_path / "report.json").exists()
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert report["input_profile"] == "slog3"
+
+
+def test_run_accepts_slog3_sgamut3cine_alias(tmp_path):
+    import argparse
+
+    args = argparse.Namespace(job=str(write_job(tmp_path, input_profile="slog3_sgamut3cine")))
+    cmd_run(args)
+    assert (tmp_path / "out.cube").exists()
+
+
+def test_run_contract_version_1_still_works(tmp_path):
+    import argparse
+
+    args = argparse.Namespace(job=str(write_job(tmp_path, contract_version=1, input_profile="rec709")))
+    cmd_run(args)
+    assert (tmp_path / "out.cube").exists()
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert report["contract_version"] == 1
+    assert report["input_profile"] == "rec709"
+
+
+def test_run_rejects_slog3_under_contract_version_1(tmp_path):
+    import argparse
+
+    args = argparse.Namespace(job=str(write_job(tmp_path, contract_version=1, input_profile="slog3")))
     with pytest.raises(ValueError):
         cmd_run(args)
+    assert not (tmp_path / "out.cube").exists()
+
+
+def test_run_rejects_bad_contract_version(tmp_path):
+    import argparse
+
+    for bad in (0, 3, "2", 2.0, True):
+        args = argparse.Namespace(job=str(write_job(tmp_path, contract_version=bad)))
+        with pytest.raises(ValueError):
+            cmd_run(args)
