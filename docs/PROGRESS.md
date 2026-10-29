@@ -1,5 +1,27 @@
 # ChromaInvert Progress Log
 
+## 2026-10-29: Demo script and dry run
+
+Completed:
+- Added `docs/DEMO_SCRIPT.md`: 3 minute run-of-show (problem 20 s, live run 60 s, portability 45 s, numbers 30 s, close 25 s) with the one-command dry run, failure lines, and Resolve plus Premiere proof steps.
+- Added `scripts/run_demo.py`: extracts source and reference frames with FFmpeg, writes `work/demo/job.json` (contract v1, rec709), runs `chromainvert run`, grades a preview clip with `lut3d`, runs the synthetic benchmark, writes `timings.json` and prints a timing table.
+- Updated `assets/SOURCES.md` with the local SampleFootage entries (Rec709, Apple Log, S-log3) and the rec709-only contract note.
+- Recorded `scripts/run_demo.py` and `docs/DEMO_SCRIPT.md` under Parts of the project in `AGENTS.md`.
+- Council review (Muse Wonder) before this commit requested streaming JSONL progress, the absolute workdir fix, repo-root FFmpeg paths, and the measured dry-run numbers; applied all four.
+
+Verified:
+- `python -m pytest engine/tests -q`: 46 passed.
+- `python scripts/validate_cube.py`: PASS.
+- `python scripts/run_demo.py` on SampleFootage (Rec709 `A001_10290006_C101.mov` source, Apple Log `A001_10290006_C100.mov` reference, canonical 400 plus 30): extract 2.9 s, optimize 12.5 s, export 6.9 s, benchmark 6.3 s, total 31.1 s on CUDA.
+- Demo benchmark: baseline 4.04, recovered 2.06 mean DeltaE2000, improvement 48.9 percent (gate 40 percent).
+- `work/demo/out.cube`, `work/demo/graded.mp4`, `work/demo/before.png`, `work/demo/after.png`, `work/demo/report.json` all written; max_neighbor_delta 0.161.
+
+Decisions locked:
+- Contract v1 stays rec709-only for the demo; log footage is decoded as display-referred with an on-screen note until the bounded log working-space milestone lands.
+
+Next steps:
+- Rehearse the run-of-show on the demo machine and replace the timing numbers; precompute a fallback `work/demo` folder for the failure lines.
+
 ## 2026-10-27: CI, GitHub Actions test workflow
 
 Completed:
