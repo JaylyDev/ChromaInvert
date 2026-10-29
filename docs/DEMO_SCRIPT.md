@@ -92,7 +92,7 @@ Read from the script output and `report.json`:
   the timing table and `timings.json`.
 - Smoothness: `max_neighbor_delta`, `lattice_min`, `lattice_max` from `report.json`.
 - Stability: frame-to-frame mapping delta is 0.00 by construction (one fixed LUT).
-- Skin and shadow: anchors on, weights in `report.json` loss terms.
+- Skin and shadow: anchors on, term values in `report.json` `final_loss_terms`.
 
 Dry-run reference (RTX GPU, canonical 400 plus 30, measured 2026-10-29 on
 SampleFootage Rec709 source plus Apple Log reference): extract 2.9 s,
