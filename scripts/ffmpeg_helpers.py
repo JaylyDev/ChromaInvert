@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -88,6 +89,15 @@ def _parse_fps(frac: str) -> str:
     return frac
 
 
+def _has_audio(path: str) -> bool:
+    cmd = ["ffprobe", "-v", "error", "-select_streams", "a:0",
+           "-show_entries", "stream=codec_type", "-of", "json", path]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        return False
+    return "audio" in result.stdout
+
+
 def probe_video(path: str) -> dict:
     raw = _run_ffprobe(path)
     streams = raw.get("streams", []) or []
@@ -107,7 +117,7 @@ def probe_video(path: str) -> dict:
         "matrix": s.get("color_space") or "unknown",
         "color_range": s.get("color_range") or "unknown",
         "bit_depth": s.get("bits_per_raw_sample") or "unknown",
-        "has_audio": False,
+        "has_audio": _has_audio(path),
         "raw": raw,
     }
 
@@ -245,19 +255,27 @@ class EngineRunner:
         self.job_json = job_json
         self.timeout = timeout
         self.process: Optional[subprocess.Popen] = None
+        self.job_path: Optional[str] = None
+        self.stderr_tail: str = ""
 
     def start(self) -> None:
-        job_str = json.dumps(self.job_json)
+        job = dict(self.job_json)
+        for key in ("source_frames", "reference_frames"):
+            if key in job:
+                job[key] = [str(Path(p).absolute()) for p in job[key]]
+        for key in ("output_cube", "report_json"):
+            if key in job:
+                job[key] = str(Path(job[key]).absolute())
+        fd, self.job_path = tempfile.mkstemp(prefix="chromainvert_job_", suffix=".json")
+        with os.fdopen(fd, "w") as f:
+            json.dump(job, f)
+        assert self.job_path is not None
         self.process = subprocess.Popen(
-            ["python", "-m", "chromainvert", "run", "-"],
-            stdin=subprocess.PIPE,
+            ["python", "-m", "chromainvert", "run", self.job_path],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
-        assert self.process.stdin is not None
-        self.process.stdin.write(job_str)
-        self.process.stdin.close()
 
     def iter_events(self):
         if self.process is None or self.process.stdout is None:
@@ -279,10 +297,16 @@ class EngineRunner:
         if self.process is None:
             return 0
         try:
-            return self.process.wait(timeout=self.timeout)
+            code = self.process.wait(timeout=self.timeout)
         except subprocess.TimeoutExpired:
             self.process.kill()
-            return -1
+            code = -1
+        if self.process.stderr is not None:
+            self.stderr_tail = self.process.stderr.read() or ""
+        if self.job_path is not None and os.path.exists(self.job_path):
+            os.remove(self.job_path)
+            self.job_path = None
+        return code
 
 
 def run_engine_stream(job_json: dict, timeout: Optional[int] = None, on_event=None) -> dict:
@@ -294,7 +318,9 @@ def run_engine_stream(job_json: dict, timeout: Optional[int] = None, on_event=No
             on_event(event)
         if event.get("event") == "done":
             report = event
-    runner.wait()
+    code = runner.wait()
+    if not report:
+        report = {"event": "error", "returncode": code, "stderr": runner.stderr_tail[-2000:]}
     return report
 
 
