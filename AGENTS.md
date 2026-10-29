@@ -24,6 +24,7 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `scripts/premiere_validation.py`: FFmpeg `lut3d` vs Python `DifferentiableLUT3D` comparison with tetrahedral gap check and optional Premiere still scoring.
 - `scripts/run_benchmark.py`: runs the synthetic benchmark and writes `work/benchmark.json`.
 - `scripts/run_demo.py`: demo dry run; extracts frames with FFmpeg, writes `work/demo/job.json`, runs the engine, grades a preview clip with `lut3d`, runs the synthetic benchmark, prints a timing table.
+- `scripts/export_graded.py`: graded video export, applies a `.cube` with FFmpeg `lut3d` with quoting, CRF and Rec.709 tags; standalone and job.json driven.
 - `docs/DEMO_SCRIPT.md`: 3 minute run-of-show with commands, timings, and failure lines, plus the real-footage quickstart.
 - `scripts/validate_real_footage.py`: validates a real-footage cube (size, finiteness, range, neighbor delta, FFmpeg lut3d, informational effect-magnitude DeltaE).
 - `scripts/extract_frames.py`: extracts N frames from a video via FFmpeg.

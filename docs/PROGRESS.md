@@ -1,5 +1,16 @@
 # ChromaInvert Progress Log
 
+## 2026-10-29: Feature, FFmpeg graded-video export script
+
+Completed:
+- Added `scripts/export_graded.py`: applies a `.cube` to a video or still image with FFmpeg `lut3d` and exports H.264 MP4 with explicit Rec.709 tags. Supports positional and flag args, `--job work/job.json` cube resolution relative to the job file, `--crf` and `--preset`, tetrahedral default interp, filter path quoting for spaces and filter metacharacters, `--dry-run`, `--overwrite` guard, and UTF-8 BOM tolerant job parsing.
+- Recorded the script under Parts of the project in `AGENTS.md`.
+
+Verified:
+- `python -m pytest engine/tests -q`: 46 passed.
+- `python scripts/validate_cube.py`: PASS.
+- Sample footage `Rec709/A001_10290006_C101.mov` trimmed to 2s: identity 33 cube graded to 4K H.264 with bt709 tags intact; swap cube produced a visibly recolored MP4; `work/src.png` still graded to MP4; job mode resolved `output_cube` relative to `work/job_test.json` and wrote the same MP4; `--dry-run` quoting held for a cube path containing a space.
+
 ## 2026-10-29: Bounded S-Log3 working space (issue 6)
 
 Completed:
@@ -66,9 +77,7 @@ Completed:
 - Added `docs/PREMIERE_VALIDATION.md`: thresholds (Python vs trilinear mean at or under 1.0; Premiere vs FFmpeg tetrahedral under 2.0), synthetic and SampleFootage run commands, MCP test steps with manual fallback, failure triage.
 - Recorded both files under Parts of the project in `AGENTS.md`.
 
-Verified:
-- `python -m pytest engine/tests -q`: 46 passed.
-- `python scripts/validate_cube.py`: PASS.
+## 2026-10-29: Demo script and dry run
 - `python scripts/run_demo.py` on SampleFootage (Rec709 `A001_10290006_C101.mov` source, Apple Log `A001_10290006_C100.mov` reference, canonical 400 plus 30): extract 2.9 s, optimize 12.5 s, export 6.9 s, benchmark 6.3 s, total 31.1 s on CUDA.
 - Demo benchmark: baseline 4.04, recovered 2.06 mean DeltaE2000, improvement 48.9 percent (gate 40 percent).
 - `work/demo/out.cube`, `work/demo/graded.mp4`, `work/demo/before.png`, `work/demo/after.png`, `work/demo/report.json` all written; max_neighbor_delta 0.161.
