@@ -1,6 +1,5 @@
 import argparse
 import subprocess
-import sys
 from pathlib import Path
 
 
@@ -24,10 +23,10 @@ def _probe_duration(video: Path) -> float | None:
     if proc.returncode != 0:
         return None
     token = (proc.stdout or "").strip().split()[0] if (proc.stdout or "").strip() else ""
-    stripped = token.lstrip("+-").replace("e", "", 1).replace("E", "", 1)
-    if not stripped.replace(".", "", 1).isdigit():
+    try:
+        value = float(token)
+    except ValueError:
         return None
-    value = float(token)
     return value if value > 0 else None
 
 
@@ -38,8 +37,11 @@ def extract_frames(video: Path | str, out_dir: Path | str, num_frames: int = 3) 
         raise ValueError("num_frames must be positive")
     out_dir.mkdir(parents=True, exist_ok=True)
     duration = _probe_duration(video)
-    if duration is not None and num_frames > 1:
-        timestamps = [duration * i / (num_frames + 1) for i in range(1, num_frames + 1)]
+    if duration is not None:
+        if num_frames > 1:
+            timestamps = [duration * i / (num_frames + 1) for i in range(1, num_frames + 1)]
+        else:
+            timestamps = [duration / 2]
     else:
         timestamps = [float(i) for i in range(num_frames)]
     results: list[Path] = []

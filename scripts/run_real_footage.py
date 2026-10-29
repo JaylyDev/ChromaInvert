@@ -114,10 +114,14 @@ def main() -> int:
     source_input = args.source
     reference_input = args.reference
     both_none = source_input is None and reference_input is None
+    if (source_input is None) != (reference_input is None):
+        raise ValueError("source and reference must both be set or both be omitted")
     # refuse if an input lives under a directory we are about to wipe
-    for inp, d in ((source_input, source_dir), (reference_input, reference_dir)):
-        if inp is not None and Path(inp).resolve().is_relative_to(d.resolve()):
-            raise ValueError(f"input must not be inside the output directory: {inp}")
+    resolved_inputs = [Path(p).resolve() for p in (source_input, reference_input) if p is not None]
+    for inp in resolved_inputs:
+        for d in (source_dir, reference_dir):
+            if inp.is_relative_to(d.resolve()):
+                raise ValueError(f"input must not be inside the output directory: {inp}")
 
     for d in (source_dir, reference_dir):
         if d.exists():
@@ -148,7 +152,7 @@ def main() -> int:
 
     output_cube.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"job written: {job_path}")
+    print(f"job written: {job_path}", flush=True)
     env = dict(os.environ)
     env["PYTHONPATH"] = str(ROOT / "engine") + os.pathsep + env.get("PYTHONPATH", "")
     result = subprocess.run(
@@ -167,14 +171,21 @@ def main() -> int:
     validate_script = ROOT / "scripts" / "validate_real_footage.py"
     if not both_none and source_files:
         v = subprocess.run(
-            [sys.executable, str(validate_script), str(output_cube), str(source_files[0].resolve())],
+            [
+                sys.executable,
+                str(validate_script),
+                str(output_cube),
+                str(source_files[0].resolve()),
+                "--expected-size",
+                str(args.lut_size),
+            ],
             env=env,
         )
         if v.returncode != 0:
-            print("validation failed")
+            print("validation failed", flush=True)
             return v.returncode
     elif both_none:
-        print("synthetic fallback: skipping real-footage validation")
+        print("synthetic fallback: skipping real-footage validation", flush=True)
 
     print(f"output cube: {output_cube}")
     return 0

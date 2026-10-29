@@ -72,7 +72,7 @@ def main() -> int:
     neighbor = max(diffs) if diffs else 0.0
     neighbor_ok = neighbor < 0.5
     neighbor_warn = neighbor >= 0.2
-    title_ok = isinstance(lut.title, str) and len(lut.title) > 0
+    title_ok = lut.title == "ChromaInvert"
     domain_ok = lut.domain_min == (0.0, 0.0, 0.0) and lut.domain_max == (1.0, 1.0, 1.0)
 
     print(f"LUT_3D_SIZE: {lut.size} ({'PASS' if size_ok else 'FAIL'})")
@@ -85,6 +85,8 @@ def main() -> int:
 
     ok = size_ok and finite_ok and min_ok and max_ok and neighbor_ok and title_ok and domain_ok
 
+    if out_path.exists():
+        out_path.unlink()
     code, err = run_ffmpeg_lut3d(cube_path, image_path, out_path)
     ffmpeg_ok = code == 0 and out_path.exists()
     print(f"ffmpeg lut3d: code={code} out={out_path} ({'PASS' if ffmpeg_ok else 'FAIL'})")
