@@ -76,6 +76,11 @@ def test_sgamut3cine_to_rec709_neutral():
     np.testing.assert_allclose(converted, neutral, rtol=2e-3, atol=1e-6)
 
 
+def test_sgamut3cine_to_rec709_saturated_red():
+    converted = sgamut3cine_to_rec709(np.array([[1.0, 0.0, 0.0]]))
+    np.testing.assert_allclose(converted, [[1.62668883, -0.17851985, -0.04444677]], rtol=1e-6)
+
+
 def test_linear_to_bounded_midtone_identity():
     x = np.array([0.0, 0.18, 0.5, 0.9])
     np.testing.assert_allclose(linear_to_bounded(x), x, rtol=1e-12)

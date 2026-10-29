@@ -118,3 +118,24 @@ def test_run_contract_version_1_still_works(tmp_path):
     args = argparse.Namespace(job=str(write_job(tmp_path, contract_version=1, input_profile="rec709")))
     cmd_run(args)
     assert (tmp_path / "out.cube").exists()
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert report["contract_version"] == 1
+    assert report["input_profile"] == "rec709"
+
+
+def test_run_rejects_slog3_under_contract_version_1(tmp_path):
+    import argparse
+
+    args = argparse.Namespace(job=str(write_job(tmp_path, contract_version=1, input_profile="slog3")))
+    with pytest.raises(ValueError):
+        cmd_run(args)
+    assert not (tmp_path / "out.cube").exists()
+
+
+def test_run_rejects_bad_contract_version(tmp_path):
+    import argparse
+
+    for bad in (0, 3, "2", 2.0, True):
+        args = argparse.Namespace(job=str(write_job(tmp_path, contract_version=bad)))
+        with pytest.raises(ValueError):
+            cmd_run(args)

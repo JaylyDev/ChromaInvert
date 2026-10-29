@@ -51,7 +51,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     workdir = job_path.parent
     job = json.loads(job_path.read_text())
     contract_version = job.get("contract_version")
-    if contract_version not in (1, 2):
+    if type(contract_version) is not int or contract_version not in (1, 2):
         raise ValueError("unsupported contract_version, expected 1 or 2")
     for key in ("source_frames", "reference_frames", "output_cube", "report_json"):
         if key not in job:
@@ -67,6 +67,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     profile = str(job.get("input_profile", "rec709"))
     if profile not in _ALLOWED_PROFILES:
         raise ValueError(f"unsupported input_profile {profile!r}, expected one of {sorted(_ALLOWED_PROFILES)}")
+    if contract_version == 1 and profile != "rec709":
+        raise ValueError(f"input_profile {profile!r} requires contract_version 2")
     strength = float(job.get("strength", 1.0))
     if not 0.0 <= strength <= 1.0:
         raise ValueError("strength must be in [0, 1]")

@@ -72,7 +72,7 @@ Full-range versus limited-range: the engine assumes full-range code values where
 3. Bounded highlight handling: scene linear can be up to 38 and negative after the gamut matrix for out-of-gamut colors. The pipeline first clamps negatives to 0, then applies a soft highlight compression to map HDR into bounded `[0, 1]` without hard clipping:
    - For `x <= 0.9`: `y = x` (identity, so midtones and 90 percent white are untouched).
    - For `x > 0.9`: `y = 0.9 + 0.1 * (x - 0.9) / (x - 0.9 + 0.15)`
-   - This is monotonic, smooth, and invertible; as `x` goes to infinity `y` approaches 1. Exposure is preserved at 1:1 below the knee, so 0.18 scene maps to 0.18 working space and 0.9 scene maps to 0.9 working space. Highlights above 0.9 are compressed into 0.9 to 1.0 with a shoulder of 0.15 that avoids banding and preserves detail that a hard clip would destroy.
+   - This is monotonic, continuous, and invertible for `y` in `[0, 1)`; as `x` goes to infinity `y` approaches 1. Exposure is preserved at 1:1 below the knee, so 0.18 scene maps to 0.18 working space and 0.9 scene maps to 0.9 working space. Highlights above 0.9 are compressed into 0.9 to 1.0 with a shoulder of 0.15 that avoids banding and preserves detail that a hard clip would destroy.
    - Inverse: `bounded_to_linear` recovers scene linear for preview or debugging via `x = 0.9 + a * 0.15 / (1 - a)` where `a = (y - 0.9) / 0.1`. The forward is documented as working-space only; the exported `.cube` operates in the bounded display-referred domain and does not need the inverse at runtime.
 
 This bounded space keeps optimization in `[0, 1]` so Oklab, quantile, moment, covariance, and gamut losses remain well behaved on log footage.
