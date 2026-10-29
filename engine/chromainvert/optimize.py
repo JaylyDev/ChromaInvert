@@ -1,3 +1,5 @@
+import os
+import random
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -42,6 +44,7 @@ class OptimizeConfig:
     weight_skin: float = 0.05
     weight_shadow: float = 0.25
     weight_gamut: float = 1.0
+    deterministic: bool = False
 
     def __post_init__(self) -> None:
         if self.coarse_size < 2 or self.fine_size < 2:
@@ -86,6 +89,30 @@ def affine_warm_start(source: NDArray[np.floating], reference: NDArray[np.floati
     return np.clip(identity_lattice(size).astype(np.float64) * gain + bias, 0.0, 1.0).astype(np.float32)
 
 
+def enable_deterministic(seed: int) -> dict[str, str | bool | int]:
+    if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    # warn_only: grid_sample backward has no deterministic CUDA kernel, so strict mode raises.
+    # Sticky process-global mode: once enabled it stays on for later calls in the same process.
+    torch.use_deterministic_algorithms(True, warn_only=True)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    status: dict[str, str | bool | int] = {
+        "cublas_workspace_config": os.environ.get("CUBLAS_WORKSPACE_CONFIG", ""),
+        "deterministic_algorithms": True,
+        "deterministic_warn_only": True,
+        "cudnn_deterministic": True,
+        "cudnn_benchmark": False,
+        "seed": seed,
+    }
+    return status
+
+
 def optimize_lut(
     source_frames: list[NDArray[np.floating]],
     reference_frames: list[NDArray[np.floating]],
@@ -93,6 +120,9 @@ def optimize_lut(
     progress: Callable[[int, int, float, float], None] | None = None,
 ) -> tuple[CubeLut, dict]:
     started = time.monotonic()
+    det_status: dict[str, str | bool | int] | None = None
+    if config.deterministic:
+        det_status = enable_deterministic(config.seed)
     device = torch.device(resolve_device(config.device))
     source = sample_pixels(source_frames, config.pixel_budget, config.seed)
     reference = sample_pixels(reference_frames, config.pixel_budget, config.seed + 1)
@@ -170,6 +200,11 @@ def optimize_lut(
     )
     report = {
         "device": str(device),
+        "deterministic": bool(config.deterministic),
+        "deterministic_warn_only": bool(det_status["deterministic_warn_only"]) if det_status else False,
+        "deterministic_cublas": str(det_status["cublas_workspace_config"]) if det_status else "",
+        "deterministic_algorithms_enabled": bool(torch.are_deterministic_algorithms_enabled()),
+        "variance_note": "Deterministic requested: best effort only. CPU repeats exactly; CUDA grid_sample backward has no deterministic kernel so identical seeds may still vary. Mode is process-global and sticky with 10-30pct slowdown" if config.deterministic else "GPU atomic nondeterminism causes 4-5pct spread in improvement without deterministic mode; enable deterministic for best-effort reproducibility with 10-30pct slowdown",
         "seed": config.seed,
         "coarse_size": config.coarse_size,
         "fine_size": config.fine_size,

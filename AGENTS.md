@@ -14,9 +14,9 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `engine/chromainvert/losses.py`: quantile and moment distribution matching, covariance matching, TV smoothness, identity prior, skin and shadow anchors, gamut penalty.
 - `engine/chromainvert/masks.py`: YCbCr skin heuristic and luminance shadow masks.
 - `engine/chromainvert/spline.py`: separable Catmull-Rom upsampling for coarse-to-fine lattices.
-- `engine/chromainvert/optimize.py`: Adam optimization loop with seeded pixel sampling and the `OptimizeConfig` weights.
+- `engine/chromainvert/optimize.py`: Adam optimization loop with seeded pixel sampling, the `OptimizeConfig` weights, and the `deterministic` GPU mode flag.
 - `engine/chromainvert/cli.py`: `chromainvert run job.json` and `chromainvert benchmark` entry points.
-- `engine/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000).
+- `engine/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000) plus the seeded random-RGB probe heldout gate.
 - `app/`: C++ desktop host skeleton (FFmpeg pipeline, preview UI). Not yet implemented.
 - `scripts/validate_cube.py`: FFmpeg `lut3d` acceptance check for exported cubes.
 - `scripts/premiere_validation.py`: FFmpeg `lut3d` vs Python `DifferentiableLUT3D` comparison with tetrahedral gap check and optional Premiere still scoring.

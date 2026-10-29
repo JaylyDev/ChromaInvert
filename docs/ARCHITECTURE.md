@@ -29,6 +29,7 @@ Contract v2 is backwards compatible with v1; v1 jobs with `input_profile: rec709
 | `strength` | float | 1.0 | blend of recovered LUT toward identity |
 | `seed` | int | 42 | deterministic pixel sampling |
 | `device` | str | `auto` | `auto`, `cuda`, or `cpu` |
+| `deterministic` | bool | `false` | enable deterministic GPU mode |
 | `output_cube` | str | required | exported `.cube` path |
 | `report_json` | str | required | metrics report path |
 
@@ -46,6 +47,14 @@ Failure is a nonzero exit with no `done` line and diagnostics on stderr. Hosts t
 ## report.json
 
 Final loss terms per name, `device` actually used, `seconds`, lattice stats (`lattice_min`, `lattice_max`, `max_neighbor_delta`), pixel counts, and library versions. `report.json` also records `contract_version` and `input_profile` as received.
+
+## Deterministic mode and variance note
+
+GPU nondeterminism from `grid_sample` backward atomic adds and quantile ties on flat chart patches causes a 4-5 percent spread in improvement without deterministic mode (observed 41.9 to 46.2 percent, baseline 4.04 to recovered 2.17-2.35 mean DeltaE2000 across runs). CPU runs are deterministic by default.
+
+Deterministic mode is best effort, not exact on CUDA. It is enabled via `job.json` with `deterministic: true` for `chromainvert run`, or via the `benchmark` subcommand flag `--deterministic` for `chromainvert benchmark`. It sets `CUBLAS_WORKSPACE_CONFIG=:4096:8` when absent (must be set before the first CUDA init) and calls `torch.use_deterministic_algorithms(True, warn_only=True)` (warn_only because the 3D LUT `grid_sample` backward has no deterministic CUDA kernel in current PyTorch), seeds torch, NumPy, Python random and CUDA, and disables cuDNN benchmarking. CPU repeats exactly under identical seeds; CUDA may still vary across identical seeded runs. Mode is process-global and sticky: once enabled it stays on for later calls in the same process. Performance tradeoff is a 10-30 percent slowdown. The report includes `deterministic`, `deterministic_warn_only`, `deterministic_cublas`, `deterministic_algorithms_enabled`, and a `variance_note` field describing this behavior.
+
+The random-RGB probe heldout uses `is_probe_gate_pass`: pass when probe improvement reaches 0.4, or when recovered probe DeltaE is below 3.0 and strictly better than baseline. `run_benchmark` returns `probe_gate_pass` (alias `heldout_gate_pass` for compatibility), `chart_gate_pass`, combined `benchmark_gate_pass`, `heldout_gate_threshold` 0.4, and `heldout_gate_absolute` 3.0. The `benchmark` CLI exits 0 only when `benchmark_gate_pass` is true.
 
 ## Color pipeline
 
