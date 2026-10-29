@@ -26,7 +26,7 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `docs/ARCHITECTURE.md`: engine contract v1 (`job.json` schema, stdout JSONL protocol, `report.json` fields, color pipeline).
 - `docs/PROGRESS.md`: timestamped build log, updated with every feature.
 - `engine/tests/test_*.py`: one test module per engine module above; update both together.
-- `.github/workflows/tests.yml`: CI workflow running `python -m pytest engine/tests -q` on push and pull request.
+- `.github/workflows/tests.yml`: CI workflow running `python -m pytest engine/tests -q` on Ubuntu plus an MSVC Release build of `app` on Windows, on push and pull request.
 
 ## Build and run
 
