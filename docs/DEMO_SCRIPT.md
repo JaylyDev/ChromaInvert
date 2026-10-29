@@ -22,10 +22,11 @@ Color matching a reference film frame onto raw footage takes hours of manual cur
 ChromaInvert exports a smooth industry-standard `.cube` with zero AI artifacts, ready for Premiere Pro, DaVinci Resolve, FFmpeg, or mobile camera apps.
 
 ## Quickstart for real footage
-1. `ffmpeg -y -ss 0 -i <clip> -frames:v 1 -q:v 2 work/frames/source/source_001.png`
-2. Create warm reference at `work/frames/reference/ref_001.png`.
-3. `python -m chromainvert run work/job.json`
-4. `python scripts/validate_real_footage.py work/out.cube work/frames/source/source_001.png`
+1. `New-Item -ItemType Directory -Force work/frames/source, work/frames/reference`
+2. `ffmpeg -y -ss 0 -i <clip> -frames:v 1 -q:v 2 work/frames/source/source_001.png`
+3. Create warm reference at `work/frames/reference/ref_001.png` (grade one manually, or run `ffmpeg -y -i work/frames/source/source_001.png -vf "colorbalance=rs=0.15:bs=-0.15,eq=saturation=1.2" -frames:v 1 -q:v 2 work/frames/reference/ref_001.png`).
+4. `python -m chromainvert run work/job.json` (see `assets/job.json.example`).
+5. `python scripts/validate_real_footage.py work/out.cube work/frames/source/source_001.png` (`scripts/validate_cube.py` only checks generic FFmpeg `lut3d` acceptance).
 
 ## Fallback lines
 - If frame extraction fails, use synthetic frames via `python scripts/run_real_footage.py` with no video arguments.

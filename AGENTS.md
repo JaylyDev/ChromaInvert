@@ -20,7 +20,7 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `app/`: C++ desktop host skeleton (FFmpeg pipeline, preview UI). Not yet implemented.
 - `scripts/validate_cube.py`: FFmpeg `lut3d` acceptance check for exported cubes.
 - `scripts/run_benchmark.py`: runs the synthetic benchmark and writes `work/benchmark.json`.
-- `scripts/validate_real_footage.py`: validates a real-footage cube (size, finiteness, range, neighbor delta, FFmpeg lut3d, optional DeltaE).
+- `scripts/validate_real_footage.py`: validates a real-footage cube (size, finiteness, range, neighbor delta, FFmpeg lut3d, informational effect-magnitude DeltaE).
 - `scripts/extract_frames.py`: extracts N frames from a video via FFmpeg.
 - `scripts/run_real_footage.py`: reusable driver for frame extraction, job creation, run, and validation with synthetic fallback.
 - `docs/DEMO_SCRIPT.md`: 3-minute demo script and real-footage quickstart.
