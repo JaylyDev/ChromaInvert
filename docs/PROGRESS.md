@@ -22,6 +22,38 @@ Completed:
 - Recorded `scripts/run_demo.py` and `docs/DEMO_SCRIPT.md` under Parts of the project in `AGENTS.md`.
 - Council review (Muse Wonder) before this commit requested streaming JSONL progress, the absolute workdir fix, repo-root FFmpeg paths, and the measured dry-run numbers; applied all four.
 
+## 2026-10-29: Fix, premiere_validation council review
+
+Completed:
+- Fixed `de00_stats` in `scripts/premiere_validation.py` to decode sRGB before CIE Lab, so the reported numbers are real DeltaE2000 instead of a gamma-distorted metric.
+- Re-read the written source and Python-graded PNGs so all three renders share identical 8-bit quantization, removing representation bias from the gate.
+- Made `rgb_stats` emit a finite PSNR (99.0 dB sentinel for identical images) and serialized the report with `allow_nan=False`.
+- Added shape and emptiness validation in `de00_stats`, `rgb_stats`, and `compare_pair`, with a graceful FAIL report for mismatched Premiere stills.
+- Rejected cubes with non-default `DOMAIN_MIN`/`DOMAIN_MAX` and missing `ffmpeg` with a clear FAIL instead of a traceback.
+- Aligned the Premiere threshold comparison with the docs ("under 2.0") and marked reports/runs where Premiere was not actually tested.
+- Softened the tetrahedral claim in `docs/PREMIERE_VALIDATION.md` to a stated proxy assumption and added an end-to-end command using an engine-generated cube.
+- Added `engine/tests/test_premiere_validation.py` (6 tests, including an FFmpeg integration test).
+
+Verified:
+- `python -m pytest engine/tests -q`: 52 passed.
+- `python scripts/validate_cube.py`: PASS.
+- `python scripts/premiere_validation.py` on synthetic chart: PASS (python vs trilinear mean 0.224; tetrahedral gap mean 0.007, max 1.079).
+
+## 2026-10-29: Fix, harden premiere_validation I/O
+
+Completed:
+- Hardened `read_rgb` in `scripts/premiere_validation.py` to handle grayscale and 16-bit inputs (dtype-aware scaling, channel expansion), matching `load_frames` in `engine/chromainvert/cli.py`.
+- Hardened `write_rgb` to create parent directories and expand grayscale images to RGB.
+- Ensured `main()` creates the output report's parent directory.
+- Verified `python scripts/premiere_validation.py` still prints PASS and the full engine suite stays green.
+
+## 2026-10-29: Feature, Premiere Pro validation run
+
+Completed:
+- Added `scripts/premiere_validation.py`: grades one source three ways (Python `DifferentiableLUT3D` trilinear, FFmpeg `lut3d` trilinear, FFmpeg `lut3d` tetrahedral), scores each pair with mean/p50/p95/max DeltaE2000 plus RGB diff and PSNR, and optionally scores a Premiere exported still against the FFmpeg tetrahedral render. Writes `work/premiere_validation.json`, exits 0 on PASS.
+- Added `docs/PREMIERE_VALIDATION.md`: thresholds (Python vs trilinear mean at or under 1.0; Premiere vs FFmpeg tetrahedral under 2.0), synthetic and SampleFootage run commands, MCP test steps with manual fallback, failure triage.
+- Recorded both files under Parts of the project in `AGENTS.md`.
+
 Verified:
 - `python -m pytest engine/tests -q`: 46 passed.
 - `python scripts/validate_cube.py`: PASS.
@@ -34,6 +66,9 @@ Decisions locked:
 
 Next steps:
 - Rehearse the run-of-show on the demo machine and replace the timing numbers; precompute a fallback `work/demo` folder for the failure lines.
+- `python scripts/premiere_validation.py` on synthetic chart: PASS (python vs trilinear mean 0.232; tetrahedral gap mean 0.008, max 1.973).
+- Same script on Rec.709 SampleFootage frame (`A001_10290006_C101.mov` at 1s): PASS (python vs trilinear mean 0.258; tetrahedral gap mean 0.015, max 1.897).
+- Identity cube plus FFmpeg tetrahedral output as `--premiere-still`: PASS (premiere pair mean 0.000).
 
 ## 2026-10-27: CI, GitHub Actions test workflow
 

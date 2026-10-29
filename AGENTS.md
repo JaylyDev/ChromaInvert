@@ -19,11 +19,13 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `engine/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000).
 - `app/`: C++ desktop host skeleton (FFmpeg pipeline, preview UI). Not yet implemented.
 - `scripts/validate_cube.py`: FFmpeg `lut3d` acceptance check for exported cubes.
+- `scripts/premiere_validation.py`: FFmpeg `lut3d` vs Python `DifferentiableLUT3D` comparison with tetrahedral gap check and optional Premiere still scoring.
 - `scripts/run_benchmark.py`: runs the synthetic benchmark and writes `work/benchmark.json`.
 - `scripts/run_demo.py`: demo dry run; extracts frames with FFmpeg, writes `work/demo/job.json`, runs the engine, grades a preview clip with `lut3d`, runs the synthetic benchmark, prints a timing table.
 - `docs/DEMO_SCRIPT.md`: 3 minute run-of-show with commands, timings, and failure lines.
 - `docs/CHROMAINVERT_HACKATHON_PLAN.md`: full technical plan and team guide.
 - `docs/ARCHITECTURE.md`: engine contract v2, backwards compatible with v1 (`job.json` schema, stdout JSONL protocol, `report.json` fields, color pipeline).
+- `docs/PREMIERE_VALIDATION.md`: Premiere Pro MCP validation procedure, thresholds, and SampleFootage steps.
 - `docs/PROGRESS.md`: timestamped build log, updated with every feature.
 - `engine/tests/test_*.py`: one test module per engine module above; update both together.
 - `.github/workflows/tests.yml`: CI workflow running `python -m pytest engine/tests -q` on push and pull request.
