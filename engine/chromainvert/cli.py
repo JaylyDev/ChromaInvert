@@ -62,8 +62,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         device=str(job.get("device", "auto")),
     )
     profile = str(job.get("input_profile", "rec709"))
-    if profile != "rec709":
-        raise ValueError(f"contract v1 supports rec709 only, got {profile}")
+    if profile not in ("rec709", "apple_log"):
+        raise ValueError(f"contract v1 supports rec709 and apple_log only, got {profile}")
     strength = float(job.get("strength", 1.0))
     if not 0.0 <= strength <= 1.0:
         raise ValueError("strength must be in [0, 1]")
