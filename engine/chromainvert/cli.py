@@ -114,9 +114,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     print(f"probe improvement: {100.0 * metrics['improvement_probe']:.1f}%")
     print(f"probe gate: {'PASS' if metrics['heldout_gate_pass'] else 'FAIL'}")
     print(f"seconds: {metrics['seconds']:.1f}")
-    chart_pass = metrics["improvement_heldout"] >= 0.4
-    probe_pass = bool(metrics["heldout_gate_pass"])
-    return 0 if (chart_pass and probe_pass) else 1
+    return 0 if bool(metrics.get("benchmark_gate_pass", False)) else 1
 
 
 def main(argv: list[str] | None = None) -> int:

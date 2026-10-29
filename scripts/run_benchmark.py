@@ -46,9 +46,7 @@ def main() -> int:
     print(f"probe gate: {'PASS' if metrics['heldout_gate_pass'] else 'FAIL'}")
     print(f"held-out PSNR: {metrics['heldout_psnr']:.1f} dB")
     print(f"seconds: {metrics['seconds']:.1f}")
-    chart_pass = metrics["improvement_heldout"] >= 0.4
-    probe_pass = bool(metrics["heldout_gate_pass"])
-    return 0 if (chart_pass and probe_pass) else 1
+    return 0 if bool(metrics.get("benchmark_gate_pass", False)) else 1
 
 
 if __name__ == "__main__":

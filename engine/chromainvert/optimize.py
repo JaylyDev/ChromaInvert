@@ -92,11 +92,16 @@ def affine_warm_start(source: NDArray[np.floating], reference: NDArray[np.floati
 def enable_deterministic(seed: int) -> dict[str, str | bool | int]:
     if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-    # warn_only: grid_sample backward has no deterministic CUDA kernel, so
-    # strict mode raises at backward time; warn_only keeps the rest deterministic.
+    # warn_only: grid_sample backward has no deterministic CUDA kernel, so strict mode raises.
+    # Sticky process-global mode: once enabled it stays on for later calls in the same process.
     torch.use_deterministic_algorithms(True, warn_only=True)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
     status: dict[str, str | bool | int] = {
         "cublas_workspace_config": os.environ.get("CUBLAS_WORKSPACE_CONFIG", ""),
         "deterministic_algorithms": True,
@@ -115,13 +120,9 @@ def optimize_lut(
     progress: Callable[[int, int, float, float], None] | None = None,
 ) -> tuple[CubeLut, dict]:
     started = time.monotonic()
+    det_status: dict[str, str | bool | int] | None = None
     if config.deterministic:
-        enable_deterministic(config.seed)
-        torch.manual_seed(config.seed)
-        np.random.seed(config.seed)
-        random.seed(config.seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(config.seed)
+        det_status = enable_deterministic(config.seed)
     device = torch.device(resolve_device(config.device))
     source = sample_pixels(source_frames, config.pixel_budget, config.seed)
     reference = sample_pixels(reference_frames, config.pixel_budget, config.seed + 1)
@@ -200,7 +201,10 @@ def optimize_lut(
     report = {
         "device": str(device),
         "deterministic": bool(config.deterministic),
-        "variance_note": "Deterministic mode enabled." if config.deterministic else "GPU atomic nondeterminism causes 4-5pct spread in improvement without deterministic mode; enable deterministic for reproducibility with 10-30pct slowdown",
+        "deterministic_warn_only": bool(det_status["deterministic_warn_only"]) if det_status else False,
+        "deterministic_cublas": str(det_status["cublas_workspace_config"]) if det_status else "",
+        "deterministic_algorithms_enabled": bool(torch.are_deterministic_algorithms_enabled()),
+        "variance_note": "Deterministic requested: best effort only. CPU repeats exactly; CUDA grid_sample backward has no deterministic kernel so identical seeds may still vary. Mode is process-global and sticky with 10-30pct slowdown" if config.deterministic else "GPU atomic nondeterminism causes 4-5pct spread in improvement without deterministic mode; enable deterministic for best-effort reproducibility with 10-30pct slowdown",
         "seed": config.seed,
         "coarse_size": config.coarse_size,
         "fine_size": config.fine_size,

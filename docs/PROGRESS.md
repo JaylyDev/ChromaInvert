@@ -62,6 +62,7 @@ Completed:
 Verified:
 - `python -m pytest engine/tests -q`: 5 passed (round trip at sizes 2, 17, 33, axis order, domain, rejection of bad files, writer validation).
 - `python scripts/validate_cube.py`: PASS. Identity 33 LUT applied with FFmpeg `lut3d` gives pixel-identical output (peak diff 0.0). Channel-swap LUT turns pure red into blue, confirming lattice axis order matches FFmpeg.
+
 ## 2026-10-29: Feature, deterministic GPU mode and random-RGB probe heldout gate
 
 Completed:
@@ -88,4 +89,12 @@ Verified:
 - `python scripts/validate_cube.py`: PASS.
 - Rec709 SampleFootage smoke test: extracted 320x180 PNG frames with FFmpeg, ran `chromainvert run` with `deterministic: true` on CPU, report records `deterministic: true` with variance note and exports a valid cube.
 - Synthetic probe smoke test on CPU: probe gate reports baseline and recovered DeltaE with `heldout_gate_pass`, `probe_count`, and `probe_seed` in `work/benchmark.json`.
+
+## 2026-10-29: Review, Wonder findings for deterministic best effort and probe gate
+
+Completed:
+- Moved all seeding into `enable_deterministic(seed)` in `engine/chromainvert/optimize.py`; report now includes `deterministic_warn_only`, `deterministic_cublas`, and `deterministic_algorithms_enabled` with a best-effort variance note (CPU exact, CUDA may still vary; mode is process-global and sticky).
+- Added `is_probe_gate_pass` in `engine/chromainvert/benchmark.py`: absolute fallback now requires strict improvement over baseline; `run_benchmark` returns `probe_gate_pass`, `chart_gate_pass`, `benchmark_gate_pass`, and `heldout_gate_absolute`; unified `mean_de00` stride and validated `probe_count`.
+- `engine/chromainvert/cli.py` and `scripts/run_benchmark.py` exit on `benchmark_gate_pass`.
+- Reworked `engine/tests/test_deterministic_heldout.py` to exercise production paths: CPU repeat equality, gate helper pass and fail, probe seed forwarding, deterministic forwarding, and CLI wiring.
 

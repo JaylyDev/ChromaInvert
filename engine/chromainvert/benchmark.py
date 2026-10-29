@@ -80,21 +80,26 @@ def apply_lut(image: NDArray[np.floating], lattice: NDArray[np.floating]) -> NDA
         return module(torch.from_numpy(np.asarray(image, dtype=np.float32))).numpy()
 
 
-def mean_de00(a: NDArray[np.floating], b: NDArray[np.floating]) -> float:
-    a = np.asarray(a).reshape(-1, 3)[::16]
-    b = np.asarray(b).reshape(-1, 3)[::16]
+def mean_de00(a: NDArray[np.floating], b: NDArray[np.floating], stride: int = 16) -> float:
+    a = np.asarray(a).reshape(-1, 3)[::stride]
+    b = np.asarray(b).reshape(-1, 3)[::stride]
     return float(delta_e_2000(linear_srgb_to_lab(a), linear_srgb_to_lab(b)).mean())
 
 
 def mean_de00_full(a: NDArray[np.floating], b: NDArray[np.floating]) -> float:
-    a = np.asarray(a).reshape(-1, 3)
-    b = np.asarray(b).reshape(-1, 3)
-    return float(delta_e_2000(linear_srgb_to_lab(a), linear_srgb_to_lab(b)).mean())
+    return mean_de00(a, b, stride=1)
 
 
 def random_rgb_probe(n: int = 10000, seed: int = 99) -> NDArray[np.float32]:
+    if n <= 0:
+        raise ValueError("probe_count must be positive")
     rng = np.random.default_rng(seed)
     return np.ascontiguousarray(rng.uniform(0.0, 1.0, size=(n, 3)), dtype=np.float32)
+
+
+def is_probe_gate_pass(baseline_probe: float, recovered_probe: float, improvement_probe: float, threshold: float = 0.4) -> bool:
+    # Absolute fallback requires strict improvement: recovered must beat baseline and sit below 3.0.
+    return bool(improvement_probe >= threshold or (recovered_probe < 3.0 and recovered_probe < baseline_probe))
 
 
 def heldout_probe_metrics(
@@ -127,6 +132,8 @@ def run_benchmark(
     probe_count: int = 10000,
     probe_seed: int | None = None,
 ) -> dict:
+    if probe_count <= 0:
+        raise ValueError("probe_count must be positive")
     started = time.monotonic()
     chart = make_chart(seed=seed)
     other = make_chart(seed=seed + 1)
@@ -157,7 +164,9 @@ def run_benchmark(
     baseline_probe = probe_metrics["baseline_probe_de00"]
     recovered_probe = probe_metrics["recovered_probe_de00"]
     improvement_probe = probe_metrics["improvement_probe"]
-    heldout_gate_pass = bool(improvement_probe >= 0.4 or recovered_probe < 3.0)
+    improvement_heldout = (baseline - recovered) / baseline if baseline > 0 else 0.0
+    chart_gate_pass = bool(improvement_heldout >= 0.4)
+    probe_gate_pass = is_probe_gate_pass(baseline_probe, recovered_probe, improvement_probe)
     return {
         "seed": seed,
         "coarse_size": coarse_size,
@@ -166,7 +175,7 @@ def run_benchmark(
         "fine_iterations": fine_iterations,
         "baseline_heldout_de00": baseline,
         "recovered_heldout_de00": recovered,
-        "improvement_heldout": (baseline - recovered) / baseline if baseline > 0 else 0.0,
+        "improvement_heldout": improvement_heldout,
         "heldout_psnr": 20.0 * np.log10(1.0 / rmse) if rmse > 0 else float("inf"),
         "seconds": time.monotonic() - started,
         "optimizer_report": report,
@@ -175,6 +184,10 @@ def run_benchmark(
         "improvement_probe": improvement_probe,
         "probe_count": probe_count,
         "probe_seed": probe_seed,
-        "heldout_gate_pass": heldout_gate_pass,
+        "heldout_gate_pass": probe_gate_pass,
+        "probe_gate_pass": probe_gate_pass,
+        "chart_gate_pass": chart_gate_pass,
+        "benchmark_gate_pass": bool(chart_gate_pass and probe_gate_pass),
         "heldout_gate_threshold": 0.4,
+        "heldout_gate_absolute": 3.0,
     }
