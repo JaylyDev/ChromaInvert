@@ -53,6 +53,20 @@ Completed:
 Verified:
 - `python -m pytest engine/tests -q`: 8 passed. Identity forward reproduces a random image within 1e-5, corners are exact, gradients flow to the volume, and the module lattice round-trips through `.cube` export.
 
+## 2026-10-29: Feature, Native FFmpeg decode and preview link (Issue #10)
+
+Completed:
+- Added `scripts/ffmpeg_helpers.py`: FFmpeg Level 1 subprocess helpers (ffprobe parse, 16-bit PNG frame extraction, lut3d preview, before/after, EngineRunner, error surfaces).
+- Added C++ desktop host under `app/`: `CMakeLists.txt`, `app/src/Ffmpeg.h/cpp`, `app/src/JobRunner.h/cpp`, `app/src/Preview.h/cpp`, `app/src/main.cpp` (probe, extract, lut3d preview, job runner).
+- Added `app/README.md`: app host docs.
+- Updated AGENTS.md Parts of the project with the new files.
+
+Verified:
+- `python -m pytest engine/tests -q`: 46 passed.
+- CMake build green: `app/build/chromainvert_app.exe` built.
+- FFmpeg probe and frame extraction validated on sample footage.
+- lut3d preview encode validated on extracted cube.
+
 ## 2026-10-27: Feature 1, .cube read/write engine
 
 Completed:
