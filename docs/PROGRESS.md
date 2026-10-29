@@ -1,5 +1,22 @@
 # ChromaInvert Progress Log
 
+## 2026-10-29: Fix, export_graded Wonder review
+
+Completed:
+- Rebasing `jayly/ffmpeg-export` onto `origin/main` first; the PR diff is back to the 3 intended files.
+- Replaced `-vsync 1` with `-fps_mode cfr` (FFmpeg 9 removed `-vsync`).
+- Added a `setparams` filter stage so Rec.709 tags land on still and untagged inputs, plus an even-dimension `scale` for yuv420p.
+- Job mode accepts the two-positional form (`in.mp4 out.mp4 --job job.json`).
+- Clean stderr errors (exit 1, no tracebacks) for malformed cube/job files, non-object jobs, missing `output_cube`, bad preset/range/fps values, and nonzero FFmpeg runs; x264 preset and color range are argparse choices.
+- `--dry-run` no longer creates directories and prints a pasteable command; the same-file check reports before the overwrite guard; removed dead lattice checks in `validate_cube`.
+- Apostrophe cube paths are rejected with a clean rename error. The prescribed `\'\'` escaping was refuted empirically on FFmpeg 9.0.2: it breaks filter chaining, and `'\''`, `''`, bare `\'`, and double quotes all fail too. An early apparent success was a stale same-named file without the apostrophe.
+- Added `engine/tests/test_export_graded.py` (9 tests: escaping, BOM job parsing, two-positional job mode, dry-run side effects, invalid fps/preset, stubbed FFmpeg failure, apostrophe rejection).
+
+Verified:
+- `python -m pytest engine/tests -q`: 78 passed.
+- `python scripts/validate_cube.py`: PASS.
+- End to end on SampleFootage Rec709: 30 fps grade via `-fps_mode cfr`; bt709 tags present on the clip and on a 255x255 still (exported 254x254); two-positional job mode; every clean-error path returns 1.
+
 ## 2026-10-29: Feature, FFmpeg graded-video export script
 
 Completed:
