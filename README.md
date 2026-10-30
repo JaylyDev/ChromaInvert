@@ -2,7 +2,7 @@
 
 Perceptual video and LUT reverse engineering engine. It recovers a smooth 3D LUT that matches source footage to a reference grade, then exports a portable `.cube` file.
 
-Built for the Meta Global AI Developer Hackathon (Oct 26 – Nov 4, 2026), Indie Dev Track.
+Built using Meta's proprietary and open weights models for the Meta Global AI Developer Hackathon (Oct 26 – Nov 4, 2026), Indie Dev Track.
 
 ## Layout
 
