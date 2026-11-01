@@ -1,0 +1,1 @@
+{"compilerOptions": {"allowSyntheticDefaultImports": true, "esModuleInterop": true, "isolatedModules": true, "jsx": "react-jsx", "lib": ["DOM", "DOM.Iterable", "ES2022"], "module": "ESNext", "moduleResolution": "bundler", "noEmit": true, "skipLibCheck": true, "strict": true, "target": "ES2022"}, "include": ["index.html", "src", "vite.config.ts"]}

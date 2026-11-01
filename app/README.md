@@ -1,15 +1,27 @@
 # ChromaInvert App Hosts
 
-This folder ships two C++ hosts that share the same `job.json` contract
-(see `docs/ARCHITECTURE.md`): a native Win32 desktop host and a C++17 console
-driver. Both write `job.json`, spawn the Python engine, and parse its stdout
-JSONL progress protocol.
+This folder ships three pieces that share the same `job.json` contract
+(see `docs/ARCHITECTURE.md`): the Electron + React product GUI in `gui/`,
+a native Win32 desktop fallback, and a C++17 console
+driver. All write `job.json`, spawn the Python engine, and parse its stdout
+JSONL progress protocol. See `docs/GUI_DECISION.md` for the Electron decision
+(Qt rejected for licensing, ImGui rejected as too developer focused).
 
-## Desktop host (Win32)
+## Product GUI (Electron + React, in `gui/`)
 
-Native Win32 skeleton for issue #9: file pickers, Match button, progress bar
+Product path per issue #9. React renderer for inputs, Match and Cancel, progress bar, wipe preview, scopes, and export. Electron main writes `job.json`, spawns `python -m chromainvert run` or `chromainvert-host`, and streams stdout JSONL progress over the preload bridge. C++ stays for FFmpeg and math helpers only.
+
+```
+cd app/gui
+npm install
+npm run dev
+```
+
+## Desktop host (Win32, legacy fallback)
+
+Native Win32 fallback for issue #9: file pickers, Match button, progress bar
 driven by the engine JSONL protocol, device and strength controls, and a log
-pane. See `docs/GUI_DECISION.md` for the Qt 6 versus ImGui decision and
+pane. Kept for offline fallback; new UI work goes in `gui/`. See `docs/GUI_DECISION.md` for the Electron decision (Qt rejected for licensing, ImGui rejected as too developer focused) and
 `docs/ARCHITECTURE.md` for the `job.json` contract.
 
 ### Prerequisites
