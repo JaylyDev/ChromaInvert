@@ -1,4 +1,4 @@
-name: GUI
+name: Build
 
 on:
   push:
@@ -35,3 +35,12 @@ jobs:
         with:
           name: chromainvert-gui-${{ matrix.os }}
           path: app/gui/release/*
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Configure app
+        run: cmake -B build -S app -A x64
+      - name: Build app
+        run: cmake --build build --config Release
+
