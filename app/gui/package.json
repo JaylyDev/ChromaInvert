@@ -1,5 +1,9 @@
 {
-  "author": "ChromaInvert contributors",
+  "author": {
+    "name": "ChromaInvert contributors",
+    "email": "65847850+JaylyDev@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/JaylyDev/ChromaInvert",
   "description": "ChromaInvert product GUI: Electron + React driving the job.json contract",
   "license": "Apache-2.0",
   "main": "dist-electron/electron/main.js",
