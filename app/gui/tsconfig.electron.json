@@ -1,0 +1,1 @@
+{"compilerOptions": {"esModuleInterop": true, "isolatedModules": true, "module": "CommonJS", "moduleResolution": "node", "outDir": "dist-electron", "skipLibCheck": true, "strict": true, "target": "ES2022"}, "include": ["electron"]}

@@ -1,5 +1,57 @@
 # ChromaInvert Progress Log
 
+## 2026-11-01: Electron GUI runs and packages on any platform
+
+Completed:
+- Fixed renderer base to `./` so the production build loads under `file://`.
+- Added standard Electron lifecycle handlers (`window-all-closed` with darwin exception, `activate` recreate).
+- Added `electron-builder` with appId `com.chromainvert.gui`, `release/` output, and win (`nsis`, `portable`), mac (`dmg`, `zip`), linux (`AppImage`, `deb`) targets; `signAndEditExecutable` off so unsigned local builds need no privileges.
+- Moved React to devDependencies since Vite pre-bundles the renderer; the asar now holds only `dist/`, `dist-electron/`, and `package.json`.
+- Fixed `main` entry to `dist-electron/electron/main.js` and removed stale flat emit; `start` and `electron:dev` scripts point at the real entry.
+- Added `release/` to `.gitignore`; documented dev, start, and `dist:*` flows in `app/gui/README.md`.
+
+Verified:
+- `npm run typecheck`: pass.
+- `npm run build`: pass, relative `./assets/` script path in `dist/index.html`.
+- `npm run dist:dir` on Windows: `release/win-unpacked/ChromaInvert.exe` (189 MB) with asar containing only `dist/`, `dist-electron/`, `package.json`.
+
+## 2026-11-01: CI matrix builds the GUI on win, mac, and linux
+
+Completed:
+- Added `.github/workflows/gui.yml`: matrix over `windows-latest`, `macos-latest`, and `ubuntu-latest` running GUI `npm ci` (lockfile present), `npm run typecheck`, `npm run build`, and `npm run dist` per runner, then uploading `app/gui/release/*` as `chromainvert-gui-<os>` artifacts. mac and linux packages now come from hosted runners instead of this Windows box.
+- Recorded the workflow in `AGENTS.md`.
+- Cleaned stale `release/linux-unpacked` and `__appImage-x64` leftovers from the failed local linux attempt.
+
+Verified:
+- Workflow YAML parses; matrix is windows, macos, ubuntu.
+- `npm run dist` (the exact CI command) on this Windows host: `ChromaInvert Setup 0.1.0.exe` (81.7 MB) and `ChromaInvert 0.1.0.exe` portable (81.5 MB), signing skipped with no credentials as expected.
+
+## 2026-11-01: Electron GUI launches and Windows package proven
+
+Completed:
+- Fixed packaged blank window: sandbox preload must be CommonJS, so electron stays CommonJS with a generated `dist-electron/package.json` (`{"type":"commonjs"}`) type scope; fixed `loadFile` path from `../dist` to `../../dist`; set the window title to `ChromaInvert`.
+- Diagnosed two environment traps: `ELECTRON_RUN_AS_NODE=1` is set in this shell, which turns every electron binary into plain Node (explains the bogus `v20.18.3` version string); PyAutoGUI scripts must strip it from the child env.
+- PyAutoGUI proof: packaged `release/win-unpacked/ChromaInvert.exe` opens a `ChromaInvert` window (1650 by 1125) rendering the full form, Match and Cancel, progress bar, and `Idle` status. Same UI verified in dev against Vite.
+- Platform matrix attempted from Windows: `dist:win` and `dist:dir` pass; `dist:mac` refused by electron-builder (macOS host or mac CI only); `dist:linux` fails in `app-builder` with no Docker daemon and no Linux toolchain here (Docker client 29.7.2 present, daemon down; needs Docker Desktop running or a Linux host).
+
+Verified:
+- `npm run typecheck`: pass. `npm run build`: pass.
+- `npm run dist:dir`: `release/win-unpacked/ChromaInvert.exe` (189 MB), asar holds only `dist/`, `dist-electron/`, `package.json`.
+- PyAutoGUI launch twice: window found by title, process stays running, screenshots show the rendered UI.
+
+## 2026-11-01: Electron + React product GUI, Qt rejected per issue #9
+
+Completed:
+- Recorded the issue #9 comment as the GUI decision in `docs/GUI_DECISION.md`: Electron + React product UI, C++ kept for FFmpeg and math helpers; Qt rejected for mixed LGPL, GPLv3, and commercial licensing risk; ImGui rejected as too developer focused; Win32 host kept as legacy fallback.
+- Updated `app/README.md` with the product GUI section and legacy Win32 note.
+- Created `app/gui/`: Vite + React + TypeScript renderer (`src/App.tsx`, `src/api.ts`, `src/types.ts`), Electron main and preload (`electron/main.ts`, `electron/preload.ts`) driving the same `job.json` contract by spawning `python -m chromainvert run` and parsing stdout JSONL progress. No Qt, no ImGui.
+- Updated `AGENTS.md` parts list and build checks with the GUI files and `npm run typecheck` plus `npm run build`; added `dist-electron/` and `node_modules/` to `.gitignore`.
+
+Verified:
+- `npm run typecheck` in `app/gui`: pass.
+- `npm run build` in `app/gui`: pass, emits `dist/` and `dist-electron/`.
+- `.venv\Scripts\python.exe -m pytest engine/tests -q`: 99 passed.
+
 ## 2026-10-29: Review follow-up, Wonder re-review fixes on FFmpeg decode link (Issue #10)
 
 Completed:
