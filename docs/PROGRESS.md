@@ -1,5 +1,13 @@
 # ChromaInvert Progress Log
 
+## 2026-11-01: CI matrix green on win, mac, linux (PR #28, unmerged)
+
+Completed:
+- Gated `gui.yml` push to `main` only; PRs run via `pull_request`. Opened PR #28 from `jayly/electron-gui`, left unmerged per instruction.
+- Fixed Ubuntu deb failure by adding `homepage` plus author email to `app/gui/package.json` (fpm maintainer requirement).
+- PR run 41300747845: `gui (windows-latest)`, `gui (macos-latest)`, and `gui (ubuntu-latest)` all success, each uploading its `release/*` package.
+- Artifacts on the run, none expired: `chromainvert-gui-windows-latest` (281 MB), `chromainvert-gui-macos-latest` (497 MB), `chromainvert-gui-ubuntu-latest` (291 MB).
+
 ## 2026-11-01: Electron GUI runs and packages on any platform
 
 Completed:
