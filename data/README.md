@@ -1,8 +1,7 @@
 # Train predictor weights on your own LUTs
 
 Build a checkpoint from LUTs and frames you own, then point the app at it.
-Reference-only mode uses the checkpoint at `data/weights/predictor_rec709.pt`
-unless you pass another path.
+No checkpoint is shipped; reference-only mode requires a weights file you trained yourself.
 
 ## Organize your files
 
@@ -59,13 +58,10 @@ Override the path with `--out-weights`.
 
 ## Point the app at your checkpoint
 
-Copy your checkpoint to `data/weights/predictor_rec709.pt`.
-The GUI finds it there automatically. To use another file, set the custom
-weights field in the app, or pass the path explicitly:
+Pick the checkpoint file you just trained in the app weights field (Browse), or pass it to the CLI explicitly:
 
 ```powershell
-.venv\Scripts\python.exe -m chromainvert predict <graded.png> --profile rec709 --weights <path> --out out.cube
+.venv\Scripts\python.exe -m chromainvert predict <graded.png> --profile rec709 --weights <path\to\your\checkpoint.pt> --out out.cube
 ```
 
-Never commit a `.pt` file. `*.pt` is gitignored. To ship weights inside
-the packaged app, place the file before running `npm run dist`.
+There is no fallback weights file; the app will refuse a reference-only run until you select one. `data/weights/predictor_rec709.pt` is just the default output path for `train_lut_predictor.py` (override with `--out-weights`). Never commit a `.pt` file; `*.pt` is gitignored and no packaged app ships with weights.

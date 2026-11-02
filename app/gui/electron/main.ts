@@ -55,35 +55,6 @@ function toProfile(raw: string): string {
   return profile;
 }
 
-function findWeights(candidates: string[]): Promise<string | null> {
-  if (candidates.length === 0) {
-    return Promise.resolve(null);
-  }
-  const [head, ...tail] = candidates;
-  return stat(head).then(
-    () => head,
-    () => findWeights(tail)
-  );
-}
-
-function weightsCandidates(): string[] {
-  const found: string[] = [];
-  if (app.isPackaged) {
-    found.push(join(process.resourcesPath, "predictor_rec709.pt"));
-  }
-  let dir = process.cwd();
-  for (let i = 0; i < 4; i++) {
-    found.push(join(dir, "engine", "chromainvert", "weights", "predictor_rec709.pt"));
-    found.push(join(dir, "engine", "chromainvert", "predictor_rec709.pt"));
-    const parent = dirname(dir);
-    if (parent === dir) {
-      break;
-    }
-    dir = parent;
-  }
-  return found;
-}
-
 function contractVersionFor(profile: string): number {
   return profile.indexOf("slog3") === 0 ? 2 : 1;
 }
@@ -210,13 +181,12 @@ ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promi
   const customWeights = payload.customWeights.trim();
   const checkWeights = payload.referenceOnly
     ? (customWeights === ""
-        ? findWeights(weightsCandidates()).then((found) =>
-            found === null
-              ? { error: "Predictor weights missing: train them with scripts/train_lut_predictor.py.", path: "" }
-              : { error: null as string | null, path: found }
-          )
-        : stat(customWeights).then(
-            () => ({ error: null as string | null, path: customWeights }),
+        ? Promise.resolve({
+            error: "Pick a predictor weights .pt file: train one with scripts/train_lut_predictor.py --data-dir data and select it in the weights field.",
+            path: "",
+          })
+        : stat(resolvePath(process.cwd(), customWeights)).then(
+            () => ({ error: null as string | null, path: resolvePath(process.cwd(), customWeights) }),
             () => ({ error: `Weights file not found: ${customWeights}`, path: "" })
           ))
     : Promise.resolve({ error: null as string | null, path: "" });

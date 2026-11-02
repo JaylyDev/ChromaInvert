@@ -47,9 +47,7 @@
       "dist-electron/**/*",
       "package.json"
     ],
-    "extraResources": [
-      { "from": "../../engine/chromainvert/weights/predictor_rec709.pt", "to": "predictor_rec709.pt" }
-    ],
+
     "win": { "target": ["nsis", "portable"], "signAndEditExecutable": false },
     "mac": { "target": ["dmg", "zip"] },
     "linux": { "target": ["AppImage", "deb"] }

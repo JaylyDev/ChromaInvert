@@ -483,7 +483,7 @@ export default function App(): JSX.Element {
             </label>
             {referenceOnly && (
               <div className="field">
-                <span>Custom weights (optional, blank uses data/weights)</span>
+                <span>Predictor weights (.pt you trained)</span>
                 <div className="row">
                   <input
                     className="grow"
