@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import type { FileFilter, IpcMainInvokeEvent } from "electron";
 import type { DoneResult, JobConfig, ProgressUpdate } from "../src/types";
@@ -17,6 +17,8 @@ interface JobFile {
   contract_version: number;
   source_frames: string[];
   reference_frames: string[];
+  reference_only: boolean;
+  predict_weights: string;
   input_profile: string;
   coarse_size: number;
   lut_size: number;
@@ -155,7 +157,21 @@ ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promi
   if (payload.outputCube.trim() === "") {
     return Promise.resolve({ exitCode: 1, summary: "Pick an output .cube path." });
   }
+  if (payload.referenceFrames.length === 0) {
+    return Promise.resolve({ exitCode: 1, summary: "Pick at least one reference frame." });
+  }
+  if (!payload.referenceOnly && payload.sourceFrames.length === 0) {
+    return Promise.resolve({ exitCode: 1, summary: "Pick source frames or enable reference-only mode." });
+  }
   const profile = toProfile(payload.inputProfile);
+  const weightsPath = resolvePath(process.cwd(), "engine/chromainvert/predictor_rec709.pt");
+  const checkWeights =
+    payload.referenceOnly
+      ? stat(weightsPath).then(
+          () => null,
+          () => "Predictor weights missing: train them with scripts/train_lut_predictor.py."
+        )
+      : Promise.resolve(null);
   const outDir = dirname(payload.outputCube);
   const workdir = outDir === "" || outDir === "." ? "work" : outDir;
   const workdirAbs = resolvePath(process.cwd(), workdir);
@@ -163,8 +179,10 @@ ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promi
   const reportPath = join(workdirAbs, "report.json");
   const job: JobFile = {
     contract_version: contractVersionFor(profile),
-    source_frames: payload.sourceFrames.map((p) => resolvePath(process.cwd(), p)),
+    source_frames: payload.referenceOnly ? [] : payload.sourceFrames.map((p) => resolvePath(process.cwd(), p)),
     reference_frames: payload.referenceFrames.map((p) => resolvePath(process.cwd(), p)),
+    reference_only: payload.referenceOnly,
+    predict_weights: weightsPath,
     input_profile: profile,
     coarse_size: payload.coarseSize,
     lut_size: payload.lutSize,
@@ -178,7 +196,11 @@ ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promi
     report_json: reportPath
   };
   currentChild?.kill();
-  return mkdir(workdirAbs, { recursive: true })
+  return checkWeights.then((weightsError: string | null): Promise<DoneResult> => {
+    if (weightsError !== null) {
+      return Promise.resolve({ exitCode: 1, summary: weightsError });
+    }
+    return mkdir(workdirAbs, { recursive: true })
     .then(() => writeFile(jobPath, JSON.stringify(job, null, 2), "utf8"))
     .then(
       (): Promise<DoneResult> =>
@@ -211,6 +233,7 @@ ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promi
           });
         })
     );
+  });
 });
 
 ipcMain.handle("job:cancel", (): Promise<void> => {

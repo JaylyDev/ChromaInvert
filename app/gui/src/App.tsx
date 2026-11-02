@@ -106,6 +106,7 @@ function badgeLabel(phase: RunPhase): string {
 export default function App(): JSX.Element {
   const [sourceFrames, setSourceFrames] = useState<string[]>([]);
   const [referenceFrames, setReferenceFrames] = useState<string[]>([]);
+  const [referenceOnly, setReferenceOnly] = useState<boolean>(false);
   const [sourceManual, setSourceManual] = useState<string>("");
   const [referenceManual, setReferenceManual] = useState<string>("");
   const [outputCube, setOutputCube] = useState<string>("work/out.cube");
@@ -130,7 +131,8 @@ export default function App(): JSX.Element {
   const running = phase === RunPhase.Running;
   const desktop = isDesktop();
   const contractVersion = inputProfile.indexOf("slog3") === 0 ? 2 : 1;
-  const footageDone = sourceFrames.length > 0 && referenceFrames.length > 0;
+  const footageDone =
+    (referenceOnly || sourceFrames.length > 0) && referenceFrames.length > 0;
   const outputDone = outputCube.trim().toLowerCase().endsWith(".cube");
   const settingsValid =
     Number.isFinite(strength) &&
@@ -184,8 +186,8 @@ export default function App(): JSX.Element {
 
   function collectErrors(): string[] {
     const found: string[] = [];
-    if (sourceFrames.length === 0) {
-      found.push("Add at least one source frame.");
+    if (!referenceOnly && sourceFrames.length === 0) {
+      found.push("Add at least one source frame, or enable reference-only mode.");
     }
     if (referenceFrames.length === 0) {
       found.push("Add at least one reference frame.");
@@ -223,6 +225,7 @@ export default function App(): JSX.Element {
     return {
       sourceFrames,
       referenceFrames,
+      referenceOnly,
       outputCube: outputCube.trim(),
       inputProfile,
       strength,
@@ -382,8 +385,8 @@ export default function App(): JSX.Element {
             <FrameList
               title="Source frames"
               files={sourceFrames}
-              disabled={running}
-              hint="Ungraded footage to match."
+              disabled={running || referenceOnly}
+              hint={referenceOnly ? "Skipped in reference-only mode." : "Ungraded footage to match."}
               manualValue={sourceManual}
               onManualChange={setSourceManual}
               onManualAdd={() => {
@@ -449,6 +452,15 @@ export default function App(): JSX.Element {
               Grade settings
             </h2>
             <p className="hint">Profile decodes both sides. Strength blends back toward identity.</p>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={referenceOnly}
+                disabled={running}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setReferenceOnly(e.target.checked)}
+              />
+              Reference-only: recover the look from graded frames alone (no source needed)
+            </label>
             <div className="grid2">
               <label className="field">
                 <span>Input profile</span>
@@ -458,6 +470,7 @@ export default function App(): JSX.Element {
                   onChange={(e: ChangeEvent<HTMLSelectElement>) => setInputProfile(e.target.value)}
                 >
                   <option value="rec709">rec709</option>
+                  <option value="rec2020">rec2020</option>
                   <option value="apple_log">apple_log</option>
                   <option value="slog3">slog3</option>
                   <option value="slog3_sgamut3cine">slog3_sgamut3cine</option>
@@ -578,8 +591,8 @@ export default function App(): JSX.Element {
               Run
             </h2>
             <p className="hint">
-              {sourceFrames.length} source, {referenceFrames.length} reference, contract v
-              {contractVersion}, {device}, LUT {lutSize}.
+              {referenceOnly ? "reference-only" : sourceFrames.length + " source,"} {referenceFrames.length}{" "}
+              reference, contract v{contractVersion}, {device}, LUT {lutSize}.
             </p>
             {errors.length > 0 && (
               <div className="errors" role="alert">

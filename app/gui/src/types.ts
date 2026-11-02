@@ -1,6 +1,7 @@
 export interface JobConfig {
   sourceFrames: string[];
   referenceFrames: string[];
+  referenceOnly: boolean;
   outputCube: string;
   inputProfile: string;
   strength: number;

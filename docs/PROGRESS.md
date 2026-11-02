@@ -1,5 +1,13 @@
 # ChromaInvert Progress Log
 
+## 2026-11-02: reference-only mode in the GUI (PR4)
+
+Completed:
+- Added the reference-only checkbox to Grade settings (`App.tsx`, `types.ts`): skips the source list, validates reference plus output only, and shows a reference-only run hint.
+- Added the `rec2020` input profile option.
+- `electron/main.ts` writes `reference_only` plus `predict_weights` (resolved to `engine/chromainvert/predictor_rec709.pt`) into `job.json`, refuses reference-only runs when the weights are missing, and otherwise keeps the same `run` spawn plus JSONL progress path.
+- Verified with pyautogui against the packaged app: window opens, Grade settings show the checkbox, reference-only validation path typechecks and builds.
+
 ## 2026-11-02: single-image LUT predictor (PR3)
 
 Completed:
