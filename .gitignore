@@ -8,6 +8,11 @@ build/
 dist/
 dist-electron/
 node_modules/
-release/
 
+release/
 *.pt
+/data/videos/apple_log/*
+/data/videos/rec709/*
+/data/videos/s-log3/*
+/data/weights/*
+!**/.gitkeep

@@ -18,21 +18,32 @@ from chromainvert.lut_predictor import LutPredictor, lattice_to_cube
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Train the single-image LUT predictor")
-    parser.add_argument("--data", default="work/training_data.npz")
+    parser.add_argument("--data-dir", default="data")
+    parser.add_argument("--data", default=None)
+    parser.add_argument("--lut-dir", default=None)
     parser.add_argument("--heldout-lut", default="Vision iPhone_15_33x")
     parser.add_argument("--epochs", type=int, default=300)
     parser.add_argument("--hidden", type=int, nargs=2, default=[128, 256])
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--seed", type=int, default=7)
-    parser.add_argument("--out-weights", default="work/predictor.pt")
-    parser.add_argument("--out-metrics", default="work/predictor_metrics.json")
+    parser.add_argument("--out-weights", default=None)
+    parser.add_argument("--out-metrics", default=None)
     args = parser.parse_args()
+
+    data_dir = Path(args.data_dir)
+    data_path = args.data or str(data_dir / "training_data.npz")
+    out_weights = Path(args.out_weights) if args.out_weights else data_dir / "weights" / "predictor_rec709.pt"
+    out_metrics = Path(args.out_metrics) if args.out_metrics else data_dir / "predictor_metrics.json"
+    lut_dir = Path(args.lut_dir) if args.lut_dir else data_dir / "luts"
 
     device = torch.device("cuda" if (args.device == "auto" and torch.cuda.is_available()) or args.device == "cuda" else "cpu")
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
-    data = np.load(args.data, allow_pickle=True)
+    try:
+        data = np.load(data_path, allow_pickle=True)
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"error: cannot read training data {data_path}: {exc}")
     names = [str(n) for n in data["names"]]
     lut_ids = data["lut_ids"]
     heldout = np.array([args.heldout_lut in n for n in names]) if args.heldout_lut != "none" else np.zeros(len(names), dtype=bool)
@@ -71,7 +82,7 @@ def main() -> int:
     probe = random_rgb_probe(10000, seed=99)
     for j, i in enumerate(np.where(heldout)[0][:8]):
         lut_name = str(names[i]).split("@")[1]
-        cube_path = next(Path(r"C:\Users\lokwa\Documents\SampleFootage\LUTs").rglob(f"{lut_name}.cube"), None)
+        cube_path = next(lut_dir.rglob(f"{lut_name}.cube"), None)
         if cube_path is None:
             continue
         truth = read_cube(str(cube_path)).lattice
@@ -88,8 +99,12 @@ def main() -> int:
         "mean_baseline_de00": float(np.mean(baseline_scores)) if baseline_scores else None,
         "device": str(device),
     }
-    torch.save({"state_dict": model.state_dict(), "hidden": list(args.hidden)}, args.out_weights)
-    Path(args.out_metrics).write_text(json.dumps(metrics, indent=2))
+    if args.heldout_lut != "none" and heldout.any() and not style_scores:
+        raise SystemExit(f"error: held-out LUT {args.heldout_lut!r} has no .cube under {lut_dir}")
+    out_weights.parent.mkdir(parents=True, exist_ok=True)
+    torch.save({"state_dict": model.state_dict(), "hidden": list(args.hidden)}, out_weights)
+    out_metrics.parent.mkdir(parents=True, exist_ok=True)
+    out_metrics.write_text(json.dumps(metrics, indent=2))
     print(json.dumps(metrics, indent=2))
     return 0
 

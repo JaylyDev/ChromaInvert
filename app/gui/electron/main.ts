@@ -181,6 +181,20 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle("job:pickWeights", (event: IpcMainInvokeEvent): Promise<string | null> => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win === null) {
+    return Promise.resolve(null);
+  }
+  return dialog
+    .showOpenDialog(win, {
+      title: "Select predictor weights",
+      properties: ["openFile"],
+      filters: [{ name: "Weights", extensions: ["pt"] }, { name: "All files", extensions: ["*"] }]
+    })
+    .then((result) => (result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0]));
+});
+
 ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promise<DoneResult> => {
   const sender = event.sender;
   if (payload.outputCube.trim() === "") {
@@ -193,12 +207,18 @@ ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promi
     return Promise.resolve({ exitCode: 1, summary: "Pick source frames or enable reference-only mode." });
   }
   const profile = toProfile(payload.inputProfile);
+  const customWeights = payload.customWeights.trim();
   const checkWeights = payload.referenceOnly
-    ? findWeights(weightsCandidates()).then((found) =>
-        found === null
-          ? { error: "Predictor weights missing: train them with scripts/train_lut_predictor.py.", path: "" }
-          : { error: null as string | null, path: found }
-      )
+    ? (customWeights === ""
+        ? findWeights(weightsCandidates()).then((found) =>
+            found === null
+              ? { error: "Predictor weights missing: train them with scripts/train_lut_predictor.py.", path: "" }
+              : { error: null as string | null, path: found }
+          )
+        : stat(customWeights).then(
+            () => ({ error: null as string | null, path: customWeights }),
+            () => ({ error: `Weights file not found: ${customWeights}`, path: "" })
+          ))
     : Promise.resolve({ error: null as string | null, path: "" });
   const outDir = dirname(payload.outputCube);
   const workdir = outDir === "" || outDir === "." ? "work" : outDir;

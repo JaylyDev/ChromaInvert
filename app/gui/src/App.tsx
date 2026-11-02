@@ -107,6 +107,7 @@ export default function App(): JSX.Element {
   const [sourceFrames, setSourceFrames] = useState<string[]>([]);
   const [referenceFrames, setReferenceFrames] = useState<string[]>([]);
   const [referenceOnly, setReferenceOnly] = useState<boolean>(false);
+  const [customWeights, setCustomWeights] = useState<string>("");
   const [sourceManual, setSourceManual] = useState<string>("");
   const [referenceManual, setReferenceManual] = useState<string>("");
   const [outputCube, setOutputCube] = useState<string>("work/out.cube");
@@ -226,6 +227,7 @@ export default function App(): JSX.Element {
       sourceFrames,
       referenceFrames,
       referenceOnly,
+      customWeights: customWeights.trim(),
       outputCube: outputCube.trim(),
       inputProfile,
       strength,
@@ -271,6 +273,24 @@ export default function App(): JSX.Element {
       },
       () => {
         setStatus("Reference file dialog was unavailable.");
+      }
+    );
+  };
+
+  const onBrowseWeights = (): void => {
+    const bridge = getBridge();
+    if (bridge === null) {
+      setStatus("File dialogs need the Electron app. Type the weights path instead.");
+      return;
+    }
+    bridge.pickWeights().then(
+      (picked) => {
+        if (picked !== null && picked !== "") {
+          setCustomWeights(picked);
+        }
+      },
+      () => {
+        setStatus("Weights file dialog was unavailable.");
       }
     );
   };
@@ -461,6 +481,24 @@ export default function App(): JSX.Element {
               />
               Reference-only: recover the look from graded frames alone (no source needed)
             </label>
+            {referenceOnly && (
+              <div className="field">
+                <span>Custom weights (optional, blank uses data/weights)</span>
+                <div className="row">
+                  <input
+                    className="grow"
+                    type="text"
+                    value={customWeights}
+                    aria-label="Custom weights path"
+                    disabled={running}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setCustomWeights(e.target.value)}
+                  />
+                  <button type="button" onClick={onBrowseWeights} disabled={running}>
+                    Browse
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="grid2">
               <label className="field">
                 <span>Input profile</span>

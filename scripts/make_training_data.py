@@ -17,18 +17,25 @@ from chromainvert.lut_predictor import grade_features
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build predictor training data in working space")
-    parser.add_argument("--frames-dir", default="work/train_frames")
-    parser.add_argument("--lut-dir", default=r"C:\Users\lokwa\Documents\SampleFootage\LUTs")
+    parser.add_argument("--data-dir", default="data")
+    parser.add_argument("--frames-dir", default=None)
+    parser.add_argument("--lut-dir", default=None)
     parser.add_argument("--profile", default="rec709")
-    parser.add_argument("--out", default="work/training_data.npz")
+    parser.add_argument("--out", default=None)
     args = parser.parse_args()
+
+    data_dir = Path(args.data_dir)
+    frames_dir = args.frames_dir or str(data_dir / "videos")
+    if args.lut_dir is None:
+        raise SystemExit("error: pass --lut-dir with LUTs you own")
+    out = Path(args.out) if args.out else data_dir / "training_data.npz"
 
     cubes = sorted(Path(args.lut_dir).rglob("*33x*.cube"), key=lambda p: p.stem)
     if not cubes:
-        raise SystemExit(f"no 33x cubes under {args.lut_dir}")
-    frames = sorted(Path(args.frames_dir).rglob("*.png"))
+        raise SystemExit(f"error: no 33x cubes under {args.lut_dir}")
+    frames = sorted(Path(frames_dir).rglob("*.png"))
     if not frames:
-        raise SystemExit(f"no frames under {args.frames_dir}")
+        raise SystemExit(f"error: no frames under {frames_dir}")
 
     rng = np.random.default_rng(1234)
     truths = [read_cube(str(c)).lattice for c in cubes]
@@ -62,7 +69,6 @@ def main() -> int:
             names_out.append(f"{frame.name}@{lut_name}")
     features = np.stack(feats).astype(np.float32)
     target_arr = np.stack(targets).astype(np.float32)
-    out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(out, features=features, targets=target_arr,
                         lut_ids=np.array(lut_ids), names=np.array(names_out),
