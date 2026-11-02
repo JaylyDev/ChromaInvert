@@ -27,7 +27,7 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `app/README.md`: Windows build and run steps for the Electron GUI, both C++ hosts, shared module notes, Level 2 plan.
 - `app/gui/package.json`, `app/gui/vite.config.ts`, `app/gui/index.html`: Electron + React product GUI shell (Vite renderer, TypeScript, no Qt).
 - `app/gui/electron/main.ts`, `app/gui/electron/preload.ts`: Electron main (writes `job.json`, spawns `python -m chromainvert run`, parses stdout JSONL progress) and preload bridge.
-- `app/gui/src/App.tsx`, `app/gui/src/api.ts`, `app/gui/src/types.ts`: React one-screen GUI (inputs, Match and Cancel, progress bar, status, log tail) on the preload bridge.
+- `app/gui/src/App.tsx`, `app/gui/src/api.ts`, `app/gui/src/types.ts`: React one-screen GUI (inputs, reference-only predict mode, Match and Cancel, progress bar, status, log tail) on the preload bridge.
 - `scripts/ffmpeg_helpers.py`: FFmpeg Level 1 subprocess helpers (ffprobe parse, 16-bit PNG frame extraction with 8-bit fallback, lut3d preview, before/after, EngineRunner, error surfaces).
 - `docs/GUI_DECISION.md`: Electron + React product decision per issue #9 (Qt rejected for licensing, ImGui rejected as too developer focused, Win32 kept as fallback).
 - `scripts/validate_cube.py`: FFmpeg `lut3d` acceptance check for exported cubes.
