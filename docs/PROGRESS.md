@@ -1,5 +1,12 @@
 # ChromaInvert Progress Log
 
+## 2026-11-02: working-space eval pairs (PR2)
+
+Completed:
+- Added `scripts/make_reference_pairs.py`: extracts frames from each SampleFootage profile folder and grades them with real 33x `.cube` files, writing `work/pairs/manifest.json`. FFmpeg `lut3d` serves as a proxy for the Premiere Pro render path (the MCP `apply_lut` path is unavailable on the CEP backend), and `--working-synthesis` applies the LUT in decoded working space (rec709) so the truth LUT and recovered LUTs live in the same domain the engine optimizes. Manifest records `synthesis` per pair plus a reserved `heldout_source` frame never used for optimization.
+- Added `scripts/evaluate_single_image.py`: paired recovery check on one manifest pair, scored with style-probe and heldout DeltaE2000 plus baselines.
+- Key finding driving the next PR: paired optimization recovers grades (52.9 percent on a Premiere Lumetri grade), while blind distribution matching from a synthetic proxy does not (negative improvement in local experiments); source estimation error dominates.
+
 ## 2026-11-02: rec2020 input profile (PR1)
 
 Completed:

@@ -16,7 +16,7 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `engine/chromainvert/spline.py`: separable Catmull-Rom upsampling for coarse-to-fine lattices.
 - `engine/chromainvert/optimize.py`: Adam optimization loop with seeded pixel sampling, the `OptimizeConfig` weights, and the `deterministic` GPU mode flag.
 - `engine/chromainvert/cli.py`: `chromainvert run job.json` and `chromainvert benchmark` entry points.
-- `engine/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000) plus the seeded random-RGB probe heldout gate.
+- `engine/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000) plus the seeded random-RGB probe heldout gate and `style_probe_metrics` for LUT-to-LUT comparison on a random probe.
 - `app/CMakeLists.txt`: builds both the Win32 `ChromaInvert` desktop host and the `chromainvert-host` console driver (C++17, standard library only); the desktop target also compiles the shared `ffmpeg` module and `Preview` for the upcoming preview pane.
 - `app/src/main.cpp`, `app/src/MainWindow.*`, `app/src/JobRunner.*`: Win32 desktop host fallback (file pickers, Match and Cancel, progress bar, log pane). JobRunner writes `job.json`, spawns the engine, parses stdout JSONL progress. Product GUI is Electron + React in `app/gui/` per `docs/GUI_DECISION.md`; no Qt port.
 - `app/src/host_main.cpp`: `chromainvert-host run` and `preview` subcommands, flag parsing, frame extraction orchestration.
@@ -36,6 +36,8 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `scripts/export_graded.py`: graded video export, applies a `.cube` with FFmpeg `lut3d` with quoting, CRF and Rec.709 tags; standalone and job.json driven.
 - `docs/DEMO_SCRIPT.md`: 3 minute run-of-show with commands, timings, and failure lines, plus the real-footage quickstart.
 - `scripts/validate_real_footage.py`: validates a real-footage cube (size, finiteness, range, neighbor delta, FFmpeg lut3d, informational effect-magnitude DeltaE).
+- `scripts/make_reference_pairs.py`: builds graded eval pairs from SampleFootage clips and real `.cube` files via FFmpeg `lut3d`, writes `work/pairs/manifest.json`; `--working-synthesis` applies the LUT in decoded working space for rec709 clips.
+- `scripts/evaluate_single_image.py`: paired recovery check on one manifest pair with style-probe and heldout DeltaE2000 plus baselines.
 - `scripts/extract_frames.py`: extracts N frames from a video via FFmpeg.
 - `scripts/run_real_footage.py`: reusable driver for frame extraction, job creation, run, and validation with synthetic fallback.
 - `engine/tests/test_real_footage.py`: real-footage CLI and optimize smoke tests.
