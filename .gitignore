@@ -14,5 +14,6 @@ release/
 /data/videos/apple_log/*
 /data/videos/rec709/*
 /data/videos/s-log3/*
+/data/luts/*
 /data/weights/*
 !**/.gitkeep

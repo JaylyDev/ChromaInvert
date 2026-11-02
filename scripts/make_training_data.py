@@ -26,13 +26,12 @@ def main() -> int:
 
     data_dir = Path(args.data_dir)
     frames_dir = args.frames_dir or str(data_dir / "videos")
-    if args.lut_dir is None:
-        raise SystemExit("error: pass --lut-dir with LUTs you own")
+    lut_dir = args.lut_dir or str(data_dir / "luts")
     out = Path(args.out) if args.out else data_dir / "training_data.npz"
 
-    cubes = sorted(Path(args.lut_dir).rglob("*33x*.cube"), key=lambda p: p.stem)
+    cubes = sorted(Path(lut_dir).rglob("*33x*.cube"), key=lambda p: p.stem)
     if not cubes:
-        raise SystemExit(f"error: no 33x cubes under {args.lut_dir}")
+        raise SystemExit(f"error: no 33x cubes under {lut_dir} (train only on LUTs you own)")
     frames = sorted(Path(frames_dir).rglob("*.png"))
     if not frames:
         raise SystemExit(f"error: no frames under {frames_dir}")

@@ -10,6 +10,7 @@ Put frames you own under `data/videos`, sorted by profile:
 
 ```
 data
+├── luts
 ├── videos
 │   ├── apple_log
 │   ├── rec709
@@ -17,16 +18,20 @@ data
 └── weights
 ```
 
-Keep your `.cube` files in a separate folder. Train only on LUTs you own
-or that carry an open license. A checkpoint distills its training LUTs.
+Put frames you own under `data/videos`, sorted by profile.
+Put `.cube` files you own under `data/luts`.
+Train only on LUTs you own or that carry an open license.
+A checkpoint distills its training LUTs.
 
 ## Build the training set
 
 Run from the repo root. To use a Rec.709 frame folder and your LUT folder:
 
 ```powershell
-.venv\Scripts\python.exe scripts/make_training_data.py --data-dir data --lut-dir <your LUTs>
+.venv\Scripts\python.exe scripts/make_training_data.py --data-dir data
 ```
+
+To use LUTs outside the workspace, pass `--lut-dir` directly.
 
 To override a default, pass it directly. `--frames-dir` replaces
 `data/videos`, and `--out` replaces `data/training_data.npz`.
