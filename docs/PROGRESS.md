@@ -1,5 +1,16 @@
 # ChromaInvert Progress Log
 
+## 2026-11-02: rec2020 input profile (PR1)
+
+Completed:
+- Added `rec2020` to `decode_input` in `engine/chromainvert/color.py`: sRGB OETF inverse then `rec2020_to_rec709_linear` gamut map, clipped to `[0, 1]` for display-referred Rec.2020 footage.
+- Accepted `rec2020` in `cli.py` under contract v1 and v2; recorded the profile in `docs/ARCHITECTURE.md` (job schema row, contract note, pipeline note) and `AGENTS.md`.
+- Covered by `test_decode_input_rec2020_known_values` in `engine/tests/test_color.py` (white/black identity, gray matches sRGB linearization, red primary in gamut).
+
+Verified:
+- `python -m pytest engine/tests/test_color.py -q`: green.
+- Real Rec.2020 frame (`Rec2020_A001_10311703_C110.mov`) decodes to a bounded working space; graded eval pair built from it via FFmpeg `lut3d`.
+
 ## 2026-11-01: CI matrix green on win, mac, linux (PR #28, unmerged)
 
 Completed:

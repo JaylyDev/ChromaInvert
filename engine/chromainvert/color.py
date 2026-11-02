@@ -225,6 +225,8 @@ def rec2020_to_rec709_linear(rgb: NDArray[np.floating]) -> NDArray[np.float64]:
 def decode_input(pixels: NDArray[np.floating], profile: str) -> NDArray[np.float64]:
     if profile == "rec709":
         return srgb_to_linear(pixels)
+    if profile == "rec2020":
+        return np.clip(rec2020_to_rec709_linear(srgb_to_linear(pixels)), 0.0, 1.0)
     if profile in ("slog3", "slog3_sgamut3cine", "slog3_sgamut3.cine", "slog3_sgamut3_cine"):
         return slog3_to_working_space(pixels)
     if profile == "apple_log":

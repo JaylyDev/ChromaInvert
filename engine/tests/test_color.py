@@ -190,3 +190,13 @@ def test_decode_input_apple_log_bounded():
     assert out.min() >= 0.0 and out.max() <= 1.0
     np.testing.assert_allclose(out[0], [0.18, 0.18, 0.18], atol=1e-6)
     np.testing.assert_allclose(out[1], [1.0, 1.0, 1.0], atol=1e-12)
+
+
+def test_decode_input_rec2020_known_values():
+    np.testing.assert_allclose(decode_input(np.ones((1, 1, 3)), "rec2020"), np.ones((1, 1, 3)), atol=1e-9)
+    np.testing.assert_allclose(decode_input(np.zeros((1, 1, 3)), "rec2020"), np.zeros((1, 1, 3)), atol=1e-12)
+    np.testing.assert_allclose(
+        decode_input(np.array([[[0.5, 0.2, 0.1]]]), "rec2020"),
+        [[[0.3352295, 0.01076178, 0.00399818]]],
+        rtol=1e-6,
+    )
