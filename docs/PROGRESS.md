@@ -1,5 +1,11 @@
 # ChromaInvert Progress Log
 
+## 2026-11-02: unship proprietary predictor weights
+
+Completed:
+- Removed `engine/chromainvert/predictor_rec709.pt` from the tree: a checkpoint distills its training LUTs (commercial Phantom LUTs plus unlicensed footage), so it cannot be published. Added `engine/chromainvert/weights/README.md` with the bring-your-own-weights flow (train only on LUTs you own).
+- GUI searches `engine/chromainvert/weights/` first (packaged resources included via `extraResources`), keeping the legacy path as fallback; docs updated to match.
+
 ## 2026-11-02: GUI finds predictor weights anywhere (fix)
 
 Completed:

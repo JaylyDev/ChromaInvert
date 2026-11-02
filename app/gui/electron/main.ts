@@ -73,6 +73,7 @@ function weightsCandidates(): string[] {
   }
   let dir = process.cwd();
   for (let i = 0; i < 4; i++) {
+    found.push(join(dir, "engine", "chromainvert", "weights", "predictor_rec709.pt"));
     found.push(join(dir, "engine", "chromainvert", "predictor_rec709.pt"));
     const parent = dirname(dir);
     if (parent === dir) {
