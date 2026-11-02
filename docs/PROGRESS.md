@@ -1,5 +1,13 @@
 # ChromaInvert Progress Log
 
+## 2026-11-02: single-image LUT predictor (PR3)
+
+Completed:
+- Added `engine/chromainvert/lut_predictor.py` plus `scripts/make_training_data.py` and `scripts/train_lut_predictor.py`: 38 grade statistics drive a residual MLP predicting a 17 lattice, upsampled to 33.
+- Added `chromainvert predict` and `reference_only` support in `run` via `predict_weights`; shipped `engine/chromainvert/predictor_rec709.pt` (7.3 MB).
+- Extended `scripts/evaluate_single_image.py` with `--weights` predictor comparison.
+- Measured: unseen Vision LUT 4.6 style-probe DeltaE2000 against 14.0 baseline; Premiere Lumetri mild grade 7.0 against 8.4 baseline (+16 percent); inference 0.08 s.
+
 ## 2026-11-02: working-space eval pairs (PR2)
 
 Completed:

@@ -14,13 +14,15 @@ app --reads--> work/out.cube --applies--> FFmpeg lut3d preview and encode
 
 ## job.json (contract_version 2)
 
-Contract v2 is backwards compatible with v1; v1 jobs with `input_profile` `rec709`, `rec2020`, or `apple_log` still run when `contract_version` is 1 or 2. V2 adds bounded S-Log3 working-space support.
+Contract v2 is backwards compatible with v1; v1 jobs with `input_profile` `rec709`, `rec2020`, or `apple_log` still run when `contract_version` is 1 or 2. V2 adds bounded S-Log3 working-space support. `reference_only` jobs run under either version; the report records `mode` as `single_image` or `paired`.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `contract_version` | int | required, must be 1 or 2 | schema version; 1 supports rec709, rec2020, and apple_log, 2 adds slog3 profiles with bounded working space |
-| `source_frames` | list[str] | required | ungraded frames, 16-bit TIFF preferred (the imageio/Pillow reader downconverts 16-bit PNG to 8-bit, so use TIFF to keep precision) |
+| `source_frames` | list[str] | required | ungraded frames, 16-bit TIFF preferred (the imageio/Pillow reader downconverts 16-bit PNG to 8-bit, so use TIFF to keep precision); omit or leave empty when `reference_only` is true |
 | `reference_frames` | list[str] | required | reference grade frames |
+| `reference_only` | bool | `false` | predict the look from graded frames alone with the trained predictor; no source frames needed, `predict_weights` required |
+| `predict_weights` | str | required with `reference_only` | trained predictor checkpoint (for example `engine/chromainvert/predictor_rec709.pt`) |
 | `input_profile` | str | `rec709` | frame decoding; `rec709` for display-referred Rec.709/sRGB, `rec2020` for display-referred Rec.2020 mapped to Rec.709, `apple_log` for Apple Log (Rec.2020) to bounded SDR working space, `slog3` or `slog3_sgamut3cine` for Sony S-Log3/S-Gamut3.Cine with bounded working-space transform |
 | `coarse_size` | int | 17 | coarse optimization lattice |
 | `lut_size` | int | 33 | exported lattice size |
@@ -93,6 +95,10 @@ This bounded space keeps optimization in `[0, 1]` so Oklab, quantile, moment, co
 ### 3. Optimization
 
 Optimization compares graded source against reference in Oklab with quantile and moment matching, TV smoothness on the lattice, an identity prior, skin chroma and shadow luminance anchors, and a gamut penalty. Losses operate on the decoded working-space values; for S-Log3 this is the bounded Rec.709 display-referred linear from step 2, so the recovered LUT maps bounded working-space colors to graded display colors in a single fixed function.
+
+### 3b. Single-image prediction
+
+`chromainvert predict image --weights predictor_rec709.pt --profile rec709 --out out.cube` skips optimization: it extracts 38 grade statistics (per-channel mean, std, quantiles, Oklab moments, saturation) from the decoded graded frame and feeds them to a compact MLP that outputs a 17 x 17 x 17 residual lattice around identity, spline-upsampled to 33 and written as `.cube`. The checkpoint `engine/chromainvert/predictor_rec709.pt` is trained by `scripts/train_lut_predictor.py` on `scripts/make_training_data.py` data (real SampleFootage frames graded with real 33x LUTs plus mild parametric grades, all in working space). `run` jobs with `reference_only: true` use the same path with `predict_weights` from the job file, so the GUI needs no source frames. Measured: unseen commercial LUT 4.5 to 4.7 mean style-probe DeltaE2000 against a 14.0 identity baseline; a mild Premiere Lumetri grade improves 16 percent over baseline.
 
 ### 4. Export
 

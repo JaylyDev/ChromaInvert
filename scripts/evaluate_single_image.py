@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "engine"))
 
 from chromainvert.benchmark import apply_lut, mean_de00_full, random_rgb_probe, style_probe_metrics
-from chromainvert.cli import load_frames
+from chromainvert.cli import load_frames, predict_for_frames
 from chromainvert.color import decode_input
 from chromainvert.cube import read_cube
 from chromainvert.optimize import OptimizeConfig, optimize_lut
@@ -27,12 +27,13 @@ def read_working(path: str) -> np.ndarray:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Paired recovery check on one pair")
+    parser = argparse.ArgumentParser(description="Paired recovery and predictor check on one pair")
     parser.add_argument("--manifest", default="work/pairs/manifest.json")
     parser.add_argument("--pair-index", type=int, default=0)
     parser.add_argument("--iterations", type=int, default=100)
     parser.add_argument("--fine-iterations", type=int, default=10)
     parser.add_argument("--device", default="auto")
+    parser.add_argument("--weights", default=None)
     parser.add_argument("--out", default="work/single_image_eval.json")
     args = parser.parse_args()
 
@@ -72,12 +73,22 @@ def main() -> int:
         "paired_heldout_de00": float(mean_de00_full(truth_heldout, paired_heldout)),
         "paired_seconds": paired_seconds,
     }
+    if args.weights is not None:
+        predicted = predict_for_frames(reference, args.weights, profile)
+        predicted_heldout = apply_lut(heldout, predicted.lattice)
+        predicted_style = style_probe_metrics(probe, truth.lattice, predicted.lattice)
+        result["predicted_style_probe_de00"] = predicted_style["style_probe_de00"]
+        result["predicted_heldout_de00"] = float(mean_de00_full(truth_heldout, predicted_heldout))
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, indent=2))
     print(f"profile: {profile}")
     print(f"paired style probe dE00: {result['paired_style_probe_de00']:.3f}")
+    if "predicted_style_probe_de00" in result:
+        print(f"predicted style probe dE00: {result['predicted_style_probe_de00']:.3f}")
     print(f"paired heldout dE00: {result['paired_heldout_de00']:.3f}")
+    if "predicted_heldout_de00" in result:
+        print(f"predicted heldout dE00: {result['predicted_heldout_de00']:.3f}")
     return 0
 
 

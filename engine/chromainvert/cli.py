@@ -10,6 +10,7 @@ import torch
 
 from chromainvert.color import decode_input
 from chromainvert.cube import CubeLut, identity_lattice, write_cube
+from chromainvert.lut_predictor import LutPredictor, grade_features, lattice_to_cube
 from chromainvert.optimize import OptimizeConfig, optimize_lut
 
 _ALLOWED_PROFILES = {"rec709", "rec2020", "apple_log", "slog3", "slog3_sgamut3cine", "slog3_sgamut3.cine", "slog3_sgamut3_cine"}
@@ -53,9 +54,18 @@ def cmd_run(args: argparse.Namespace) -> int:
     contract_version = job.get("contract_version")
     if type(contract_version) is not int or contract_version not in (1, 2):
         raise ValueError("unsupported contract_version, expected 1 or 2")
-    for key in ("source_frames", "reference_frames", "output_cube", "report_json"):
+    for key in ("reference_frames", "output_cube", "report_json"):
         if key not in job:
             raise ValueError(f"job is missing required key: {key}")
+    reference_only = bool(job.get("reference_only", False))
+    sources = job.get("source_frames", [])
+    if reference_only:
+        if sources:
+            raise ValueError("source_frames must be omitted when reference_only is true")
+        if "predict_weights" not in job:
+            raise ValueError("job is missing required key: predict_weights")
+    elif "source_frames" not in job:
+        raise ValueError("job is missing required key: source_frames")
     config = OptimizeConfig(
         coarse_size=int(job.get("coarse_size", 17)),
         fine_size=int(job.get("lut_size", 33)),
@@ -73,14 +83,19 @@ def cmd_run(args: argparse.Namespace) -> int:
     strength = float(job.get("strength", 1.0))
     if not 0.0 <= strength <= 1.0:
         raise ValueError("strength must be in [0, 1]")
-    source = load_frames(job["source_frames"], profile, workdir)
+    source = load_frames(job["source_frames"], profile, workdir) if not reference_only else []
     reference = load_frames(job["reference_frames"], profile, workdir)
     started = time.monotonic()
 
     def progress(i: int, total: int, loss: float, elapsed: float) -> None:
         print(json.dumps({"event": "progress", "iter": i, "iters": total, "loss": loss, "elapsed_s": elapsed}), flush=True)
 
-    lut, report = optimize_lut(source, reference, config, progress=progress)
+    if reference_only:
+        lut = predict_for_frames(reference, str(job["predict_weights"]), profile)
+        report = {"mode": "single_image", "predict_weights": str(job["predict_weights"])}
+    else:
+        lut, report = optimize_lut(source, reference, config, progress=progress)
+        report["mode"] = "paired"
     lut = blend_toward_identity(lut, strength)
     lut.title = "ChromaInvert"
     cube_path = resolve(workdir, job["output_cube"])
@@ -90,6 +105,46 @@ def cmd_run(args: argparse.Namespace) -> int:
     report["strength"] = strength
     report["versions"] = {"python": sys.version.split()[0], "numpy": np.__version__, "torch": torch.__version__}
     resolve(workdir, job["report_json"]).write_text(json.dumps(report, indent=2))
+    print(json.dumps({"event": "done", "cube": str(cube_path), "seconds": time.monotonic() - started}), flush=True)
+    return 0
+
+
+def predict_for_frames(reference_frames: list[np.ndarray], weights: str, profile: str) -> CubeLut:
+    if not reference_frames:
+        raise ValueError("predict needs at least one reference frame")
+    stacked = np.concatenate([np.asarray(f, dtype=np.float32).reshape(-1, 3) for f in reference_frames], axis=0)
+    features = torch.from_numpy(grade_features(stacked)).unsqueeze(0)
+    checkpoint = torch.load(weights, map_location="cpu")
+    if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+        model = LutPredictor(hidden=tuple(checkpoint.get("hidden", (128, 256))))
+        model.load_state_dict(checkpoint["state_dict"])
+    else:
+        model = LutPredictor()
+        model.load_state_dict(checkpoint)
+    model.eval()
+    with torch.no_grad():
+        lattice = model(features).squeeze(0).numpy()
+    return lattice_to_cube(np.ascontiguousarray(lattice, dtype=np.float32))
+
+
+def cmd_predict(args: argparse.Namespace) -> int:
+    raw = imageio.imread(args.image)
+    if raw.ndim == 2:
+        raw = np.stack((raw, raw, raw), axis=-1)
+    if raw.ndim != 3 or raw.shape[-1] not in (3, 4):
+        raise ValueError(f"expected an RGB or RGBA image, got shape {raw.shape}")
+    if np.issubdtype(raw.dtype, np.integer):
+        pixels = raw[..., :3].astype(np.float64) / float(np.iinfo(raw.dtype).max)
+    else:
+        pixels = raw[..., :3].astype(np.float64)
+    profile = str(args.profile)
+    if profile not in _ALLOWED_PROFILES:
+        raise ValueError(f"unsupported input_profile {profile!r}")
+    working = np.asarray(decode_input(pixels, profile), dtype=np.float32)
+    started = time.monotonic()
+    cube = predict_for_frames([working], str(args.weights), profile)
+    cube_path = Path(args.out)
+    write_cube(cube_path, cube)
     print(json.dumps({"event": "done", "cube": str(cube_path), "seconds": time.monotonic() - started}), flush=True)
     return 0
 
@@ -129,6 +184,12 @@ def main(argv: list[str] | None = None) -> int:
     p_run = sub.add_parser("run", help="optimize a LUT from a job file")
     p_run.add_argument("job")
     p_run.set_defaults(func=cmd_run)
+    p_pred = sub.add_parser("predict", help="predict a LUT from a single graded image")
+    p_pred.add_argument("image")
+    p_pred.add_argument("--profile", default="rec709")
+    p_pred.add_argument("--weights", required=True)
+    p_pred.add_argument("--out", required=True)
+    p_pred.set_defaults(func=cmd_predict)
     p_bench = sub.add_parser("benchmark", help="synthetic ground-truth recovery check")
     p_bench.add_argument("--out", default="work/benchmark.json")
     p_bench.add_argument("--coarse", type=int, default=17)
