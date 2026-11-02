@@ -1,5 +1,11 @@
 # ChromaInvert Progress Log
 
+## 2026-11-02: GUI finds predictor weights anywhere (fix)
+
+Completed:
+- `electron/main.ts` now searches for `predictor_rec709.pt` in packaged resources plus upward from the working directory, so reference-only mode works when the app is launched outside the repo root; the packaged build ships the weights via `extraResources`.
+- `package.json` build config gains the `extraResources` entry for the weights file.
+
 ## 2026-11-02: reference-only mode in the GUI (PR4)
 
 Completed:
