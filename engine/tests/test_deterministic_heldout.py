@@ -8,6 +8,7 @@ from chromainvert.benchmark import (
     is_probe_gate_pass,
     random_rgb_probe,
     run_benchmark,
+    style_probe_metrics,
 )
 from chromainvert.cube import identity_lattice
 from chromainvert.optimize import OptimizeConfig, enable_deterministic, optimize_lut
@@ -33,6 +34,18 @@ def test_random_rgb_probe_defaults():
 def test_random_rgb_probe_rejects_nonpositive():
     with pytest.raises(ValueError):
         random_rgb_probe(0)
+
+
+def test_style_probe_metrics_matches_heldout_keys():
+    probe = random_rgb_probe(500, seed=3)
+    truth = commercial_style_lattice(9).astype(np.float32)
+    identity = identity_lattice(9).astype(np.float32)
+    style = style_probe_metrics(probe, truth, identity)
+    heldout = heldout_probe_metrics(probe, truth, identity)
+    assert style["style_probe_de00"] == heldout["recovered_probe_de00"]
+    assert style["style_baseline_de00"] == heldout["baseline_probe_de00"]
+    assert style["style_improvement"] == heldout["improvement_probe"]
+    np.testing.assert_allclose(style["style_probe_de00"], style["style_baseline_de00"], rtol=1e-6)
 
 
 def test_heldout_gate_fails_for_identity():

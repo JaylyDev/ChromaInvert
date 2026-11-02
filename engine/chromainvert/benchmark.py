@@ -97,6 +97,19 @@ def random_rgb_probe(n: int = 10000, seed: int = 99) -> NDArray[np.float32]:
     return np.ascontiguousarray(rng.uniform(0.0, 1.0, size=(n, 3)), dtype=np.float32)
 
 
+def style_probe_metrics(
+    probe: NDArray[np.floating],
+    truth_lattice: NDArray[np.floating],
+    recovered_lattice: NDArray[np.floating],
+) -> dict[str, float]:
+    probe_metrics = heldout_probe_metrics(probe, truth_lattice, recovered_lattice)
+    return {
+        "style_probe_de00": probe_metrics["recovered_probe_de00"],
+        "style_baseline_de00": probe_metrics["baseline_probe_de00"],
+        "style_improvement": probe_metrics["improvement_probe"],
+    }
+
+
 def is_probe_gate_pass(baseline_probe: float, recovered_probe: float, improvement_probe: float, threshold: float = 0.4) -> bool:
     # Absolute fallback requires strict improvement: recovered must beat baseline and sit below 3.0.
     return bool(improvement_probe >= threshold or (recovered_probe < 3.0 and recovered_probe < baseline_probe))
