@@ -112,6 +112,17 @@ def test_run_accepts_slog3_sgamut3cine_alias(tmp_path):
     assert (tmp_path / "out.cube").exists()
 
 
+def test_run_accepts_rec2020_under_contract_version_1(tmp_path):
+    import argparse
+
+    args = argparse.Namespace(job=str(write_job(tmp_path, contract_version=1, input_profile="rec2020")))
+    assert cmd_run(args) == 0
+    assert (tmp_path / "out.cube").exists()
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert report["contract_version"] == 1
+    assert report["input_profile"] == "rec2020"
+
+
 def test_run_contract_version_1_still_works(tmp_path):
     import argparse
 

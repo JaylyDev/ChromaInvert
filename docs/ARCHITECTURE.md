@@ -14,14 +14,14 @@ app --reads--> work/out.cube --applies--> FFmpeg lut3d preview and encode
 
 ## job.json (contract_version 2)
 
-Contract v2 is backwards compatible with v1; v1 jobs with `input_profile: rec709` or `apple_log` still run when `contract_version` is 1 or 2. V2 adds bounded S-Log3 working-space support.
+Contract v2 is backwards compatible with v1; v1 jobs with `input_profile` `rec709`, `rec2020`, or `apple_log` still run when `contract_version` is 1 or 2. V2 adds bounded S-Log3 working-space support.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `contract_version` | int | required, must be 1 or 2 | schema version; 1 supports rec709 and apple_log, 2 adds slog3 profiles with bounded working space |
+| `contract_version` | int | required, must be 1 or 2 | schema version; 1 supports rec709, rec2020, and apple_log, 2 adds slog3 profiles with bounded working space |
 | `source_frames` | list[str] | required | ungraded frames, 16-bit TIFF preferred (the imageio/Pillow reader downconverts 16-bit PNG to 8-bit, so use TIFF to keep precision) |
 | `reference_frames` | list[str] | required | reference grade frames |
-| `input_profile` | str | `rec709` | frame decoding; `rec709` for display-referred Rec.709/sRGB, `apple_log` for Apple Log (Rec.2020) to bounded SDR working space, `slog3` or `slog3_sgamut3cine` for Sony S-Log3/S-Gamut3.Cine with bounded working-space transform |
+| `input_profile` | str | `rec709` | frame decoding; `rec709` for display-referred Rec.709/sRGB, `rec2020` for display-referred Rec.2020 mapped to Rec.709, `apple_log` for Apple Log (Rec.2020) to bounded SDR working space, `slog3` or `slog3_sgamut3cine` for Sony S-Log3/S-Gamut3.Cine with bounded working-space transform |
 | `coarse_size` | int | 17 | coarse optimization lattice |
 | `lut_size` | int | 33 | exported lattice size |
 | `iterations` | int | 400 | coarse Adam iterations |
@@ -67,6 +67,8 @@ Full-range versus limited-range: the engine assumes full-range code values where
 ### 2. Input profile decoding
 
 `rec709`: `decode_input` applies `srgb_to_linear` (Rec.709/sRGB OETF inverse) to obtain display-referred linear light in `[0, 1]`. This path is unchanged from v1.
+
+`rec2020`: `decode_input` applies `srgb_to_linear`, then `rec2020_to_rec709_linear` to map Rec.2020 primaries to Rec.709 linear, clipped to `[0, 1]`. Display-referred Rec.2020 footage is treated like Rec.709 with a gamut map; no HDR OETF is assumed.
 
 `apple_log`: `decode_input` applies the Apple Log inverse OETF (`decode_apple_log` with the Apple Log Profile constants) to obtain linear Rec.2020, converts to linear Rec.709 via `rec2020_to_rec709_linear`, and clips to `[0, 1]` for a bounded SDR working space. Available under contract v1 and v2. The selected profile applies to both source and reference frames.
 
