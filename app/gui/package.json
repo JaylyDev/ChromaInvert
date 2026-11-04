@@ -47,6 +47,7 @@
       "dist-electron/**/*",
       "package.json"
     ],
+
     "win": { "target": ["nsis", "portable"], "signAndEditExecutable": false },
     "mac": { "target": ["dmg", "zip"] },
     "linux": { "target": ["AppImage", "deb"] }

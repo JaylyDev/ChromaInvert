@@ -152,6 +152,20 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle("job:pickWeights", (event: IpcMainInvokeEvent): Promise<string | null> => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win === null) {
+    return Promise.resolve(null);
+  }
+  return dialog
+    .showOpenDialog(win, {
+      title: "Select predictor weights",
+      properties: ["openFile"],
+      filters: [{ name: "Weights", extensions: ["pt"] }, { name: "All files", extensions: ["*"] }]
+    })
+    .then((result) => (result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0]));
+});
+
 ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promise<DoneResult> => {
   const sender = event.sender;
   if (payload.outputCube.trim() === "") {
@@ -164,42 +178,46 @@ ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promi
     return Promise.resolve({ exitCode: 1, summary: "Pick source frames or enable reference-only mode." });
   }
   const profile = toProfile(payload.inputProfile);
-  const weightsPath = resolvePath(process.cwd(), "engine/chromainvert/predictor_rec709.pt");
-  const checkWeights =
-    payload.referenceOnly
-      ? stat(weightsPath).then(
-          () => null,
-          () => "Predictor weights missing: train them with scripts/train_lut_predictor.py."
-        )
-      : Promise.resolve(null);
+  const customWeights = payload.customWeights.trim();
+  const checkWeights = payload.referenceOnly
+    ? (customWeights === ""
+        ? Promise.resolve({
+            error: "Pick a predictor weights .pt file: train one with scripts/train_lut_predictor.py --data-dir data and select it in the weights field.",
+            path: "",
+          })
+        : stat(resolvePath(process.cwd(), customWeights)).then(
+            () => ({ error: null as string | null, path: resolvePath(process.cwd(), customWeights) }),
+            () => ({ error: `Weights file not found: ${customWeights}`, path: "" })
+          ))
+    : Promise.resolve({ error: null as string | null, path: "" });
   const outDir = dirname(payload.outputCube);
   const workdir = outDir === "" || outDir === "." ? "work" : outDir;
   const workdirAbs = resolvePath(process.cwd(), workdir);
   const jobPath = join(workdirAbs, "job.json");
   const reportPath = join(workdirAbs, "report.json");
-  const job: JobFile = {
-    contract_version: contractVersionFor(profile),
-    source_frames: payload.referenceOnly ? [] : payload.sourceFrames.map((p) => resolvePath(process.cwd(), p)),
-    reference_frames: payload.referenceFrames.map((p) => resolvePath(process.cwd(), p)),
-    reference_only: payload.referenceOnly,
-    predict_weights: weightsPath,
-    input_profile: profile,
-    coarse_size: payload.coarseSize,
-    lut_size: payload.lutSize,
-    iterations: payload.iterations,
-    fine_iterations: payload.fineIterations,
-    strength: payload.strength,
-    seed: payload.seed,
-    device: payload.device,
-    deterministic: payload.deterministic,
-    output_cube: resolvePath(process.cwd(), payload.outputCube),
-    report_json: reportPath
-  };
   currentChild?.kill();
-  return checkWeights.then((weightsError: string | null): Promise<DoneResult> => {
-    if (weightsError !== null) {
-      return Promise.resolve({ exitCode: 1, summary: weightsError });
+  return checkWeights.then((checked: { error: string | null; path: string }): Promise<DoneResult> => {
+    if (checked.error !== null) {
+      return Promise.resolve({ exitCode: 1, summary: checked.error });
     }
+    const job: JobFile = {
+      contract_version: contractVersionFor(profile),
+      source_frames: payload.referenceOnly ? [] : payload.sourceFrames.map((p) => resolvePath(process.cwd(), p)),
+      reference_frames: payload.referenceFrames.map((p) => resolvePath(process.cwd(), p)),
+      reference_only: payload.referenceOnly,
+      predict_weights: checked.path,
+      input_profile: profile,
+      coarse_size: payload.coarseSize,
+      lut_size: payload.lutSize,
+      iterations: payload.iterations,
+      fine_iterations: payload.fineIterations,
+      strength: payload.strength,
+      seed: payload.seed,
+      device: payload.device,
+      deterministic: payload.deterministic,
+      output_cube: resolvePath(process.cwd(), payload.outputCube),
+      report_json: reportPath
+    };
     return mkdir(workdirAbs, { recursive: true })
     .then(() => writeFile(jobPath, JSON.stringify(job, null, 2), "utf8"))
     .then(

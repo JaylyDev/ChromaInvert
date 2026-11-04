@@ -1,5 +1,14 @@
 # ChromaInvert Progress Log
 
+## 2026-11-02: data directory for training assets and weights (PR #34)
+
+Completed:
+- Removed `engine/chromainvert/predictor_rec709.pt` from the tree: a checkpoint distills its training LUTs (commercial Phantom LUTs plus unlicensed footage), so it cannot be published; no fallback checkpoint is shipped. Added `data/` with `data/videos/{apple_log,rec709,s-log3}/`, `data/luts/`, and `data/weights/` plus `.gitkeep` scaffolding and `data/README.md` with the bring-your-own-weights flow (train only on LUTs you own; `*.pt`, `data/videos/*`, `data/luts/*`, `data/weights/*` are gitignored); removed `engine/chromainvert/weights/` entirely.
+- `scripts/make_training_data.py` and `scripts/train_lut_predictor.py` now accept `--data-dir` (defaults to `data`) with `--frames-dir`/`--lut-dir`/`--out`/`--data`/`--out-weights` overrides; defaults are `data/videos`, `data/luts`, `data/training_data.npz`, and `data/weights/predictor_rec709.pt`. Training in working space plus mild synthetic grades is unchanged.
+- Final commit keeps training LUTs under `data/luts/` by default instead of requiring an explicit `--lut-dir`; earlier draft required `--lut-dir` and is superseded.
+- GUI `electron/main.ts` no longer auto-discovers weights; `findWeights`/`weightsCandidates` and `app.isPackaged` `process.resourcesPath` fallback plus `extraResources` bundling were removed. `app/gui/electron/preload.ts` and `app/gui/src/{App.tsx,api.ts,types.ts}` add a required custom-weights field with a `job:pickWeights` file picker validated via `stat` (empty now errors with guidance to train with `scripts/train_lut_predictor.py`). Users must generate and pick a checkpoint themselves.
+- Docs updated: `docs/ARCHITECTURE.md` job row and section 3b now state no checkpoint is shipped and point to `data/README.md`; `AGENTS.md` bullet for `lut_predictor.py` updated to note checkpoints are never committed and are loaded via `predict_weights`/`--weights`.
+
 ## 2026-11-02: reference-only mode in the GUI (PR4)
 
 Completed:

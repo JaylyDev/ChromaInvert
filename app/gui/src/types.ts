@@ -2,6 +2,7 @@ export interface JobConfig {
   sourceFrames: string[];
   referenceFrames: string[];
   referenceOnly: boolean;
+  customWeights: string;
   outputCube: string;
   inputProfile: string;
   strength: number;

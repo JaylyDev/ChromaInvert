@@ -6,6 +6,7 @@ export interface GuiBridge {
   pickSourceFrames: () => Promise<string[]>;
   pickReferenceFrames: () => Promise<string[]>;
   pickOutputCube: (suggestedPath: string) => Promise<string | null>;
+  pickWeights: () => Promise<string | null>;
   onProgress: (cb: (update: ProgressUpdate) => void) => void;
   onLog: (cb: (line: string) => void) => void;
 }

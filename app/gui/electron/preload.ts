@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld("chromainvert", {
   pickReferenceFrames: (): Promise<string[]> => ipcRenderer.invoke("job:pickReferences"),
   pickOutputCube: (suggestedPath: string): Promise<string | null> =>
     ipcRenderer.invoke("job:pickOutput", suggestedPath),
+  pickWeights: (): Promise<string | null> => ipcRenderer.invoke("job:pickWeights"),
   onProgress: (cb: (update: ProgressUpdate) => void): void => {
     ipcRenderer.on("job:progress", (_event: IpcRendererEvent, update: ProgressUpdate) => cb(update));
   },
