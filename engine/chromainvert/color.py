@@ -64,6 +64,7 @@ _BT2020_TO_SRGB_LINEAR = np.array(
         [-0.0181507634, -0.1005788980, 1.1187296614],
     ]
 )
+_SRGB_TO_BT2020_LINEAR = np.linalg.inv(_BT2020_TO_SRGB_LINEAR)
 
 
 def srgb_to_linear(c: NDArray[np.floating]) -> NDArray[np.float64]:
@@ -220,6 +221,15 @@ def decode_apple_log(code: NDArray[np.floating]) -> NDArray[np.float64]:
 
 def rec2020_to_rec709_linear(rgb: NDArray[np.floating]) -> NDArray[np.float64]:
     return np.asarray(rgb, dtype=np.float64) @ _BT2020_TO_SRGB_LINEAR.T
+
+
+def encode_input(pixels: NDArray[np.floating], profile: str) -> NDArray[np.float64]:
+    if profile == "rec709":
+        return linear_to_srgb(np.maximum(np.asarray(pixels, dtype=np.float64), 0.0))
+    if profile == "rec2020":
+        linear2020 = np.maximum(np.asarray(pixels, dtype=np.float64), 0.0) @ _SRGB_TO_BT2020_LINEAR.T
+        return linear_to_srgb(np.maximum(linear2020, 0.0))
+    raise ValueError(f"profile has no display encoding for export: {profile}")
 
 
 def decode_input(pixels: NDArray[np.floating], profile: str) -> NDArray[np.float64]:

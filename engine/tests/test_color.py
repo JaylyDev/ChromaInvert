@@ -8,6 +8,7 @@ from chromainvert.color import (
     decode_slog3,
     delta_e_2000,
     encode_apple_log,
+    encode_input,
     encode_slog3,
     linear_srgb_to_lab,
     linear_srgb_to_oklab,
@@ -190,6 +191,22 @@ def test_decode_input_apple_log_bounded():
     assert out.min() >= 0.0 and out.max() <= 1.0
     np.testing.assert_allclose(out[0], [0.18, 0.18, 0.18], atol=1e-6)
     np.testing.assert_allclose(out[1], [1.0, 1.0, 1.0], atol=1e-12)
+
+
+def test_encode_input_rec709_roundtrip():
+    rng = np.random.default_rng(3)
+    codes = rng.random((50, 3))
+    np.testing.assert_allclose(encode_input(decode_input(codes, "rec709"), "rec709"), codes, atol=1e-9)
+
+
+def test_encode_input_rec2020_roundtrip():
+    codes = np.array([[0.5, 0.5, 0.5], [0.8, 0.6, 0.4], [0.3, 0.3, 0.3]])
+    np.testing.assert_allclose(encode_input(decode_input(codes, "rec2020"), "rec2020"), codes, atol=1e-6)
+
+
+def test_encode_input_rejects_log_profiles():
+    with pytest.raises(ValueError):
+        encode_input(np.zeros((1, 3)), "apple_log")
 
 
 def test_decode_input_rec2020_known_values():

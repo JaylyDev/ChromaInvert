@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from numpy.typing import NDArray
 
 from chromainvert.cube import CubeLut, identity_lattice
@@ -44,6 +45,7 @@ class OptimizeConfig:
     weight_skin: float = 0.05
     weight_shadow: float = 0.25
     weight_gamut: float = 1.0
+    weight_paired: float = 0.0
     deterministic: bool = False
 
     def __post_init__(self) -> None:
@@ -67,6 +69,31 @@ def sample_pixels(frames: list[NDArray[np.floating]], budget: int, seed: int) ->
     if flat.shape[0] > budget:
         flat = flat[rng.choice(flat.shape[0], budget, replace=False)]
     return np.ascontiguousarray(np.clip(flat, 0.0, 1.0), dtype=np.float32)
+
+
+def sample_paired_pixels(
+    source_frames: list[NDArray[np.floating]], reference_frames: list[NDArray[np.floating]], budget: int, seed: int
+) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
+    if len(source_frames) != len(reference_frames):
+        raise ValueError("paired optimization requires the same number of source and reference frames")
+    source_arrays = [np.asarray(f, dtype=np.float32) for f in source_frames]
+    reference_arrays = [np.asarray(f, dtype=np.float32) for f in reference_frames]
+    for source_frame, reference_frame in zip(source_arrays, reference_arrays):
+        if source_frame.ndim != 3 or source_frame.shape[-1] != 3:
+            raise ValueError(f"expected (H, W, 3) frames, got shape {source_frame.shape}")
+        if source_frame.shape != reference_frame.shape:
+            raise ValueError(f"paired frames must have matching shapes, got {source_frame.shape} and {reference_frame.shape}")
+    flat_source = np.concatenate([a.reshape(-1, 3) for a in source_arrays], axis=0)
+    flat_reference = np.concatenate([a.reshape(-1, 3) for a in reference_arrays], axis=0)
+    rng = np.random.default_rng(seed)
+    if flat_source.shape[0] > budget:
+        indices = rng.choice(flat_source.shape[0], budget, replace=False)
+        flat_source = flat_source[indices]
+        flat_reference = flat_reference[indices]
+    return (
+        np.ascontiguousarray(np.clip(flat_source, 0.0, 1.0), dtype=np.float32),
+        np.ascontiguousarray(np.clip(flat_reference, 0.0, 1.0), dtype=np.float32),
+    )
 
 
 def resolve_device(requested: str) -> str:
@@ -124,8 +151,11 @@ def optimize_lut(
     if config.deterministic:
         det_status = enable_deterministic(config.seed)
     device = torch.device(resolve_device(config.device))
-    source = sample_pixels(source_frames, config.pixel_budget, config.seed)
-    reference = sample_pixels(reference_frames, config.pixel_budget, config.seed + 1)
+    if config.weight_paired > 0.0:
+        source, reference = sample_paired_pixels(source_frames, reference_frames, config.pixel_budget, config.seed)
+    else:
+        source = sample_pixels(source_frames, config.pixel_budget, config.seed)
+        reference = sample_pixels(reference_frames, config.pixel_budget, config.seed + 1)
     source_mask = skin_mask_rgb(source)
     dither_rng = np.random.default_rng(config.seed + 2)
     noise_scale = 0.5 / 255.0
@@ -156,6 +186,7 @@ def optimize_lut(
             l_skin = skin_anchor_loss(graded_oklab, src_oklab, skin)
             l_shadow = shadow_quantile_loss(graded_oklab[..., 0], ref_l, src_shadow, ref_shadow)
             l_gamut = gamut_loss(graded)
+            l_paired = F.mse_loss(graded_oklab, reference_oklab)
             total_loss = (
                 config.weight_quantile * l_quantile
                 + config.weight_moment * l_moment
@@ -165,6 +196,7 @@ def optimize_lut(
                 + config.weight_skin * l_skin
                 + config.weight_shadow * l_shadow
                 + config.weight_gamut * l_gamut
+                + config.weight_paired * l_paired
             )
             total_loss.backward()
             optimizer.step()
@@ -178,6 +210,7 @@ def optimize_lut(
                 "skin": l_skin.item(),
                 "shadow": l_shadow.item(),
                 "gamut": l_gamut.item(),
+                "paired": l_paired.item(),
                 "total": total_loss.item(),
             }
             if progress is not None:

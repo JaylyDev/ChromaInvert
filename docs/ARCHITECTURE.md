@@ -23,7 +23,10 @@ Contract v2 is backwards compatible with v1; v1 jobs with `input_profile` `rec70
 | `reference_frames` | list[str] | required | reference grade frames |
 | `reference_only` | bool | `false` | predict the look from graded frames alone with the trained predictor; no source frames needed, `predict_weights` required |
 | `predict_weights` | str | required with `reference_only` | path to a predictor checkpoint you trained yourself (no checkpoint is shipped; see `data/README.md` for training and picking the file in the app or via `--weights`) |
-| `input_profile` | str | `rec709` | frame decoding; `rec709` for display-referred Rec.709/sRGB, `rec2020` for display-referred Rec.2020 mapped to Rec.709, `apple_log` for Apple Log (Rec.2020) to bounded SDR working space, `slog3` or `slog3_sgamut3cine` for Sony S-Log3/S-Gamut3.Cine with bounded working-space transform |
+| `input_profile` | str | `rec709` | source frame decoding; `rec709` for display-referred Rec.709/sRGB, `rec2020` for display-referred Rec.2020 mapped to Rec.709, `apple_log` for Apple Log (Rec.2020) to bounded SDR working space, `slog3` or `slog3_sgamut3cine` for Sony S-Log3/S-Gamut3.Cine with bounded working-space transform |
+| `reference_profile` | str | `rec709` for log input profiles, otherwise `input_profile` | reference frame decoding; graded reference frames (for example a manual grade exported from Premiere) are display-referred, so log sources default to `rec709` instead of decoding the graded export as log; set it explicitly only when the reference frames really use another profile |
+| `weight_tv` / `weight_shadow` | float | `0.1` / `0.25` | optimizer loss weights, same meaning as in `OptimizeConfig`; lower values fit the reference distribution (including saturation) more closely at the cost of cross-content generalization |
+| `weight_paired` | float | `0.0` | when positive, source and reference frames must be aligned pairs (same count and shapes) and an additional per-pixel Oklab MSE loss on corresponding pixels is added; use it when the reference is the same footage after grading, not for matching a look across different scenes |
 | `coarse_size` | int | 17 | coarse optimization lattice |
 | `lut_size` | int | 33 | exported lattice size |
 | `iterations` | int | 400 | coarse Adam iterations |
@@ -35,7 +38,7 @@ Contract v2 is backwards compatible with v1; v1 jobs with `input_profile` `rec70
 | `output_cube` | str | required | exported `.cube` path |
 | `report_json` | str | required | metrics report path |
 
-`input_profile` aliases: `slog3`, `slog3_sgamut3cine`, `slog3_sgamut3.cine`, and `slog3_sgamut3_cine` all select the same S-Log3 bounded working-space pipeline. The profile applies to both source and reference frames; mixed-profile jobs should pre-convert outside the engine.
+`input_profile` aliases: `slog3`, `slog3_sgamut3cine`, `slog3_sgamut3.cine`, and `slog3_sgamut3_cine` all select the same S-Log3 bounded working-space pipeline. `input_profile` decodes source frames and `reference_profile` decodes reference frames; the defaults above cover the usual pair of log source plus display-referred graded reference, and any other mixed pair should set `reference_profile` explicitly.
 
 ## stdout protocol
 
@@ -48,7 +51,7 @@ Failure is a nonzero exit with no `done` line and diagnostics on stderr. Hosts t
 
 ## report.json
 
-Final loss terms per name, `device` actually used, `seconds`, lattice stats (`lattice_min`, `lattice_max`, `max_neighbor_delta`), pixel counts, and library versions. `report.json` also records `contract_version` and `input_profile` as received.
+Final loss terms per name, `device` actually used, `seconds`, lattice stats (`lattice_min`, `lattice_max`, `max_neighbor_delta`), pixel counts, and library versions. `report.json` also records `contract_version`, `input_profile`, the resolved `reference_profile`, and `export_domain` (`host` or legacy `working`). Note the bug fix behind these fields changes v1 `apple_log` jobs that omit `reference_profile`: they now decode references as display Rec.709 and export a host-domain cube; add `"reference_profile": "apple_log"` to a v1 job to reproduce the old working-space behavior.
 
 ## Deterministic mode and variance note
 
@@ -72,7 +75,7 @@ Full-range versus limited-range: the engine assumes full-range code values where
 
 `rec2020`: `decode_input` applies `srgb_to_linear`, then `rec2020_to_rec709_linear` to map Rec.2020 primaries to Rec.709 linear, clipped to `[0, 1]`. Display-referred Rec.2020 footage is treated like Rec.709 with a gamut map; no HDR OETF is assumed.
 
-`apple_log`: `decode_input` applies the Apple Log inverse OETF (`decode_apple_log` with the Apple Log Profile constants) to obtain linear Rec.2020, converts to linear Rec.709 via `rec2020_to_rec709_linear`, and clips to `[0, 1]` for a bounded SDR working space. Available under contract v1 and v2. The selected profile applies to both source and reference frames.
+`apple_log`: `decode_input` applies the Apple Log inverse OETF (`decode_apple_log` with the Apple Log Profile constants) to obtain linear Rec.2020, converts to linear Rec.709 via `rec2020_to_rec709_linear`, and clips to `[0, 1]` for a bounded SDR working space. Available under contract v1 and v2. This decodes source frames; reference frames use `reference_profile` (default `rec709` here, because graded references are display-referred).
 
 `slog3` and `slog3_sgamut3cine`: `decode_input` performs the bounded S-Log3 working-space transform defined in `engine/chromainvert/color.py`:
 
@@ -88,7 +91,7 @@ Full-range versus limited-range: the engine assumes full-range code values where
    - For `x <= 0.9`: `y = x` (identity, so midtones and 90 percent white are untouched).
    - For `x > 0.9`: `y = 0.9 + 0.1 * (x - 0.9) / (x - 0.9 + 0.15)`
    - This is monotonic, continuous, and invertible for `y` in `[0, 1)`; as `x` goes to infinity `y` approaches 1. Exposure is preserved at 1:1 below the knee, so 0.18 scene maps to 0.18 working space and 0.9 scene maps to 0.9 working space. Highlights above 0.9 are compressed into 0.9 to 1.0 with a shoulder of 0.15 that avoids banding and preserves detail that a hard clip would destroy.
-   - Inverse: `bounded_to_linear` recovers scene linear for preview or debugging via `x = 0.9 + a * 0.15 / (1 - a)` where `a = (y - 0.9) / 0.1`. The forward is documented as working-space only; the exported `.cube` operates in the bounded display-referred domain and does not need the inverse at runtime.
+   - Inverse: `bounded_to_linear` recovers scene linear for preview or debugging via `x = 0.9 + a * 0.15 / (1 - a)` where `a = (y - 0.9) / 0.1`. The bounded transform is optimization-internal; step 4 bakes the full decode into the exported host-domain cube, so no inverse is needed at runtime.
 
 This bounded space keeps optimization in `[0, 1]` so Oklab, quantile, moment, covariance, and gamut losses remain well behaved on log footage.
 
@@ -102,8 +105,8 @@ Optimization compares graded source against reference in Oklab with quantile and
 
 ### 4. Export
 
-The recovered lattice is blended by `strength` toward identity, clamped to `[0, 1]`, and written red-fastest per the IRIDAS/Adobe `.cube` subset. `DOMAIN_MIN` and `DOMAIN_MAX` remain 0 to 1 because the working space is already bounded.
+The recovered lattice is blended by `strength` toward identity in working space, then baked into a host-domain cube: each lattice node holds source code values as a host LUT receives them, so the baked value is `encode_input(graded_working(decode_input(node)))` with the source decode from `input_profile` and the display encode from `reference_profile`. The baked lattice is clamped to `[0, 1]` and written red-fastest per the IRIDAS/Adobe `.cube` subset, with `DOMAIN_MIN` and `DOMAIN_MAX` 0 to 1. Applying the exported cube directly to source footage therefore targets the graded reference without a separate decode step in the host; because hosts interpolate between lattice nodes in code space, saturated log colors carry some interpolation error versus a per-pixel decode (mean abs error under 0.02 on random codes for an identity Apple Log bake, with larger isolated errors on saturated colors). The one exception is a legacy job that sets `reference_profile` equal to a log `input_profile`: there is no display encoding for a log target, so the working-space lattice is exported unchanged and `report.json` records `export_domain` as `working` (otherwise `host`).
 
 ### 5. Preview
 
-FFmpeg `lut3d` applies the same file for preview and export, so the in-app result matches DaVinci Resolve and Premiere Pro by construction. For S-Log3 sources the preview pipeline is: decode S-Log3 to bounded working space, apply `out.cube`, display as Rec.709. For Apple Log sources: decode Apple Log to bounded SDR working space, apply `out.cube`, display as Rec.709. No additional inverse is needed because the LUT was optimized in that bounded domain.
+FFmpeg `lut3d` applies the exported host-domain cube directly to the source footage for preview and export: for Apple Log and S-Log3 sources the cube already contains the log decode and the display encode from step 4. Premiere Pro is not identical by construction: current Premiere builds recognize Apple Log clips (color space `Apple Log/Rec. 2020` in `get_color_space`) and color-manage them toward the Rec.709 sequence before Lumetri, so a cube that is correct in FFmpeg can still differ as a Lumetri Input LUT unless that conversion is accounted for; see `docs/PREMIERE_VALIDATION.md` for the still-based check.

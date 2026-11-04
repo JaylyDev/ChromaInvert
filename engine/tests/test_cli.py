@@ -4,8 +4,10 @@ import imageio.v2 as imageio
 import numpy as np
 import pytest
 
-from chromainvert.cli import blend_toward_identity, cmd_run, load_frames
+from chromainvert.cli import bake_export_lut, blend_toward_identity, cmd_run, load_frames
+from chromainvert.color import encode_apple_log, linear_to_srgb
 from chromainvert.cube import CubeLut, identity_lattice
+from chromainvert.lut_module import DifferentiableLUT3D
 
 
 def test_load_frames_uint16_and_grayscale(tmp_path):
@@ -150,6 +152,94 @@ def test_run_rejects_bad_contract_version(tmp_path):
         args = argparse.Namespace(job=str(write_job(tmp_path, contract_version=bad)))
         with pytest.raises(ValueError):
             cmd_run(args)
+
+
+def test_bake_export_lut_apple_log_identity_maps_log_code_to_display():
+    import torch
+
+    baked = bake_export_lut(CubeLut(size=33, lattice=identity_lattice(33)), "apple_log", "rec709")
+    module = DifferentiableLUT3D(baked.size, lattice=baked.lattice)
+    gray_code = float(encode_apple_log(np.array([0.18]))[0])
+    pixel = torch.full((1, 1, 3), gray_code)
+    with torch.no_grad():
+        out = module(pixel).numpy()
+    np.testing.assert_allclose(out[0, 0], linear_to_srgb(np.array([0.18, 0.18, 0.18])), atol=0.02)
+
+
+def test_bake_export_lut_rec709_asymmetric_composition():
+    import torch
+
+    swap = CubeLut(size=33, lattice=np.ascontiguousarray(identity_lattice(33)[..., [2, 1, 0]]))
+    baked = bake_export_lut(swap, "rec709", "rec709")
+    module = DifferentiableLUT3D(baked.size, lattice=baked.lattice)
+    pixel = torch.tensor([[[0.2, 0.5, 0.8]]])
+    with torch.no_grad():
+        out = module(pixel).numpy()
+    from chromainvert.color import srgb_to_linear
+
+    expected = linear_to_srgb(srgb_to_linear(np.array([0.2, 0.5, 0.8]))[[2, 1, 0]])
+    np.testing.assert_allclose(out[0, 0], expected, atol=0.02)
+
+
+def test_bake_export_lut_slog3_identity_maps_mid_code_to_display():
+    import torch
+
+    baked = bake_export_lut(CubeLut(size=33, lattice=identity_lattice(33)), "slog3", "rec709")
+    module = DifferentiableLUT3D(baked.size, lattice=baked.lattice)
+    pixel = torch.full((1, 1, 3), 420.0 / 1023.0)
+    with torch.no_grad():
+        out = module(pixel).numpy()
+    np.testing.assert_allclose(out[0, 0], linear_to_srgb(np.array([0.18, 0.18, 0.18])), atol=0.02)
+
+
+def test_bake_export_lut_apple_log_saturated_mean_error_small():
+    import torch
+
+    baked = bake_export_lut(CubeLut(size=33, lattice=identity_lattice(33)), "apple_log", "rec709")
+    module = DifferentiableLUT3D(baked.size, lattice=baked.lattice)
+    rng = np.random.default_rng(4)
+    codes = rng.random((256, 1, 3)).astype(np.float32)
+    with torch.no_grad():
+        out = module(torch.from_numpy(codes)).numpy()
+    from chromainvert.color import decode_input, encode_input
+
+    expected = encode_input(decode_input(codes.astype(np.float64), "apple_log"), "rec709")
+    assert float(np.abs(out - expected).mean()) < 0.02
+
+
+def test_bake_export_lut_legacy_log_reference_stays_working_domain():
+    lut = CubeLut(size=5, lattice=identity_lattice(5))
+    baked = bake_export_lut(lut, "apple_log", "apple_log")
+    np.testing.assert_allclose(baked.lattice, lut.lattice, atol=0.0)
+
+
+def test_run_records_weight_overrides(tmp_path):
+    import argparse
+
+    args = argparse.Namespace(job=str(write_job(tmp_path, weight_tv=0.03, weight_shadow=0.05)))
+    assert cmd_run(args) == 0
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert report["weight_tv"] == 0.03
+    assert report["weight_shadow"] == 0.05
+
+
+def test_run_apple_log_reports_rec709_reference_profile(tmp_path):
+    import argparse
+
+    args = argparse.Namespace(job=str(write_job(tmp_path, input_profile="apple_log")))
+    assert cmd_run(args) == 0
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert report["reference_profile"] == "rec709"
+    assert report["export_domain"] == "host"
+
+
+def test_run_rejects_log_reference_profile(tmp_path):
+    import argparse
+
+    args = argparse.Namespace(job=str(write_job(tmp_path, input_profile="apple_log", reference_profile="slog3")))
+    with pytest.raises(ValueError):
+        cmd_run(args)
+    assert not (tmp_path / "out.cube").exists()
 
 
 def test_run_accepts_apple_log(tmp_path):
