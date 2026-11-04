@@ -971,6 +971,13 @@ export default function App(): JSX.Element {
                 the reference profile on rec709.
               </p>
             )}
+            {isLogProfile(resolvedReference) && (
+              <p className="hint">
+                Reference profile is a log profile: the graded reference will be decoded as log and the cube
+                exports in legacy working-domain mode, which does not match in Premiere. Use Auto (rec709)
+                unless you need the legacy path.
+              </p>
+            )}
             <label className="check">
               <input
                 type="checkbox"

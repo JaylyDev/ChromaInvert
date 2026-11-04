@@ -5,6 +5,7 @@
 Completed:
 - GUI Grade settings now send the new engine method: source `input_profile` plus an explicit reference profile (Auto resolves to `rec709` for Apple Log and S-Log3, otherwise the source profile), `weight_tv`, `weight_shadow`, and `weight_paired` via a same-frame pairs checkbox (10 when checked, 0 otherwise). Apple Log jobs therefore export the host-domain cube that applies directly in Premiere and FFmpeg, with a log-profile reference rejected the same way as the engine. A GUI-shaped `apple_log` to `rec709` job with paired weights runs end to end and records `export_domain host`.
 - `npm run typecheck` and `npm run build` pass.
+- Follow-up: Grade settings now warn when the resolved reference profile is a log profile (legacy working-domain export that does not match in Premiere), so the `apple_log`/`apple_log` misconfiguration is called out in the UI.
 
 ## 2026-11-04: host-domain cube export for log profiles
 
