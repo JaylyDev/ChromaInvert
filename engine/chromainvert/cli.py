@@ -8,12 +8,35 @@ import imageio.v2 as imageio
 import numpy as np
 import torch
 
-from chromainvert.color import decode_input
+from chromainvert.color import decode_input, encode_input
 from chromainvert.cube import CubeLut, identity_lattice, write_cube
+from chromainvert.lut_module import DifferentiableLUT3D
 from chromainvert.lut_predictor import LutPredictor, grade_features, lattice_to_cube
 from chromainvert.optimize import OptimizeConfig, optimize_lut
 
 _ALLOWED_PROFILES = {"rec709", "rec2020", "apple_log", "slog3", "slog3_sgamut3cine", "slog3_sgamut3.cine", "slog3_sgamut3_cine"}
+_LOG_PROFILES = {"apple_log", "slog3", "slog3_sgamut3cine", "slog3_sgamut3.cine", "slog3_sgamut3_cine"}
+
+
+def default_reference_profile(profile: str) -> str:
+    return "rec709" if profile in _LOG_PROFILES else profile
+
+
+def _canonical_profile(profile: str) -> str:
+    return "slog3" if profile in _LOG_PROFILES and profile != "apple_log" else profile
+
+
+def bake_export_lut(lut: CubeLut, input_profile: str, reference_profile: str) -> CubeLut:
+    if input_profile in _LOG_PROFILES and _canonical_profile(reference_profile) == _canonical_profile(input_profile):
+        return lut
+    codes = identity_lattice(lut.size)
+    working = decode_input(codes.astype(np.float64), input_profile)
+    module = DifferentiableLUT3D(lut.size, lattice=lut.lattice)
+    with torch.no_grad():
+        graded = module(torch.from_numpy(np.ascontiguousarray(working, dtype=np.float32))).numpy()
+    display = encode_input(graded.astype(np.float64), reference_profile)
+    lattice = np.ascontiguousarray(np.clip(display, 0.0, 1.0), dtype=np.float32)
+    return CubeLut(size=lut.size, lattice=lattice, title=lut.title)
 
 
 def resolve(base: Path, p: str) -> Path:
@@ -74,17 +97,25 @@ def cmd_run(args: argparse.Namespace) -> int:
         seed=int(job.get("seed", 42)),
         device=str(job.get("device", "auto")),
         deterministic=bool(job.get("deterministic", False)),
+        weight_tv=float(job.get("weight_tv", 0.1)),
+        weight_shadow=float(job.get("weight_shadow", 0.25)),
+        weight_paired=float(job.get("weight_paired", 0.0)),
     )
     profile = str(job.get("input_profile", "rec709"))
     if profile not in _ALLOWED_PROFILES:
         raise ValueError(f"unsupported input_profile {profile!r}, expected one of {sorted(_ALLOWED_PROFILES)}")
     if contract_version == 1 and profile not in ("rec709", "rec2020", "apple_log"):
         raise ValueError(f"input_profile {profile!r} requires contract_version 2")
+    reference_profile = str(job.get("reference_profile", default_reference_profile(profile)))
+    if reference_profile not in _ALLOWED_PROFILES:
+        raise ValueError(f"unsupported reference_profile {reference_profile!r}, expected one of {sorted(_ALLOWED_PROFILES)}")
+    if reference_profile in _LOG_PROFILES and _canonical_profile(reference_profile) != _canonical_profile(profile):
+        raise ValueError(f"reference_profile {reference_profile!r} is a log profile; graded references must use a display profile such as 'rec709'")
     strength = float(job.get("strength", 1.0))
     if not 0.0 <= strength <= 1.0:
         raise ValueError("strength must be in [0, 1]")
     source = load_frames(job["source_frames"], profile, workdir) if not reference_only else []
-    reference = load_frames(job["reference_frames"], profile, workdir)
+    reference = load_frames(job["reference_frames"], reference_profile, workdir)
     started = time.monotonic()
 
     def progress(i: int, total: int, loss: float, elapsed: float) -> None:
@@ -97,11 +128,17 @@ def cmd_run(args: argparse.Namespace) -> int:
         lut, report = optimize_lut(source, reference, config, progress=progress)
         report["mode"] = "paired"
     lut = blend_toward_identity(lut, strength)
+    lut = bake_export_lut(lut, profile, reference_profile)
     lut.title = "ChromaInvert"
     cube_path = resolve(workdir, job["output_cube"])
     write_cube(cube_path, lut)
     report["contract_version"] = contract_version
     report["input_profile"] = profile
+    report["reference_profile"] = reference_profile
+    report["weight_tv"] = config.weight_tv
+    report["weight_shadow"] = config.weight_shadow
+    report["weight_paired"] = config.weight_paired
+    report["export_domain"] = "working" if profile in _LOG_PROFILES and _canonical_profile(reference_profile) == _canonical_profile(profile) else "host"
     report["strength"] = strength
     report["versions"] = {"python": sys.version.split()[0], "numpy": np.__version__, "torch": torch.__version__}
     resolve(workdir, job["report_json"]).write_text(json.dumps(report, indent=2))
@@ -140,9 +177,11 @@ def cmd_predict(args: argparse.Namespace) -> int:
     profile = str(args.profile)
     if profile not in _ALLOWED_PROFILES:
         raise ValueError(f"unsupported input_profile {profile!r}")
-    working = np.asarray(decode_input(pixels, profile), dtype=np.float32)
+    reference_profile = default_reference_profile(profile)
+    working = np.asarray(decode_input(pixels, reference_profile), dtype=np.float32)
     started = time.monotonic()
     cube = predict_for_frames([working], str(args.weights), profile)
+    cube = bake_export_lut(cube, profile, reference_profile)
     cube_path = Path(args.out)
     write_cube(cube_path, cube)
     print(json.dumps({"event": "done", "cube": str(cube_path), "seconds": time.monotonic() - started}), flush=True)

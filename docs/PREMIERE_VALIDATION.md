@@ -63,7 +63,7 @@ ffmpeg -y -loglevel error -ss 1 -i "C:\Users\lokwa\Documents\SampleFootage\Rec70
 python scripts/premiere_validation.py --cube work/out.cube --source work/src_frame.png
 ```
 
-3. For S-Log3 or Apple Log clips, extract first and convert to the Rec.709 working space before this test. The v1 contract grades display-referred Rec.709 values; log decoding is out of scope for this check.
+3. For S-Log3 or Apple Log clips, pass the raw log frame as the source: the exported host-domain cube already contains the log decode (see `docs/ARCHITECTURE.md` step 4), so pre-converting to Rec.709 would double-transform. Only a legacy `export_domain: working` cube needs a pre-converted source.
 
 ## Premiere Pro MCP test
 
@@ -75,6 +75,12 @@ Planned automated path (test harness only; end users import the `.cube` normally
 4. Keep the still and the MCP session log as demo evidence.
 
 If the MCP is flaky or version mismatched, drop to the manual checklist immediately: import the clip, apply the LUT through Lumetri, export frame, run the same command. The numeric claim is identical either way.
+
+## Apple Log note (measured 2026-11-04)
+
+On the `chromainvert_playground` project (Premiere Pro 2025.0, Windows, CEP MCP), the iPhone clip reports color space `Apple Log/Rec. 2020` via `get_color_space`, and Premiere color-manages it toward the Rec.709 sequence before Lumetri: the raw-log host cube (`work/apple_fix/fixed_apple_log.cube`, FFmpeg mean DeltaE2000 7.5 against the Premiere manual still) measured 31.9 to 32.0 in Premiere after a Lumetri Browse re-pick, because Lumetri receives the converted Rec.709 image, not log code values. Two host limits were measured at the same time: the MCP `apply_lut` tool is unavailable on CEP, and writing a new LUT path with `set_effect_property` updates the parameter string without reliably loading the LUT into the render (an identity and a channel-swap cube rendered identically), so every cube change in Premiere needs a manual Browse re-pick before exporting stills.
+
+For a cube that matches inside Premiere with its default log handling, train in the domain Premiere actually feeds: export ungraded stills from Premiere itself (no LUT on the clip) as source frames and manual-grade stills as reference frames, run a `rec709` job on those PNGs, and apply the exported cube as the Lumetri Input LUT. Measured on this project that cube (`work/apple_fix/premiere_apple_log.cube`) scored mean DeltaE2000 7.28 and 7.38 against the manual stills at two source times, in line with the FFmpeg result for the raw-log cube. A vibrance follow-up on 2026-11-04 found the distribution-only cube undersaturated in Premiere (mean Oklab chroma 0.0416 against the manual 0.0434, chroma p90 about 9 percent low): an aligned-pair job (`weight_paired` 10, `weight_tv` 0.03, `weight_shadow` 0.05) plus a saturation-calibrated blend against a closed-loop variant landed at `work/apple_fix/premiere_apple_log_v5.cube`, measured in Premiere at mean DeltaE2000 6.06 and 6.11 with mean chroma within 3 percent of the manual stills. Premiere renders a given cube slightly darker than FFmpeg on the same frames, so judge Premiere cubes only by Premiere stills. Use the raw-log host cube (log `input_profile` job on FFmpeg-extracted frames) for FFmpeg, DaVinci Resolve, and any host that applies the LUT to log code values directly.
 
 ## Failure triage
 

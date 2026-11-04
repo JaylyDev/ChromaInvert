@@ -1,5 +1,19 @@
 # ChromaInvert Progress Log
 
+## 2026-11-04: GUI uses the host-domain Apple Log path
+
+Completed:
+- GUI Grade settings now send the new engine method: source `input_profile` plus an explicit reference profile (Auto resolves to `rec709` for Apple Log and S-Log3, otherwise the source profile), `weight_tv`, `weight_shadow`, and `weight_paired` via a same-frame pairs checkbox (10 when checked, 0 otherwise). Apple Log jobs therefore export the host-domain cube that applies directly in Premiere and FFmpeg, with a log-profile reference rejected the same way as the engine. A GUI-shaped `apple_log` to `rec709` job with paired weights runs end to end and records `export_domain host`.
+- `npm run typecheck` and `npm run build` pass.
+- Follow-up: Grade settings now warn when the resolved reference profile is a log profile (legacy working-domain export that does not match in Premiere), so the `apple_log`/`apple_log` misconfiguration is called out in the UI.
+
+## 2026-11-04: host-domain cube export for log profiles
+
+Completed:
+- Fixed generated LUTs not matching the manual grade on the same Apple Log footage: `cli.py` decoded graded reference frames with the source log profile, and the exported cube held the linear working-space lattice while hosts feed a LUT log code values and expect display output. Added `reference_profile` (defaults to `rec709` for log input profiles, otherwise `input_profile`), `encode_input` in `color.py` (Rec.709 and Rec.2020 display encodings), and `bake_export_lut` in `cli.py`, which bakes source decode plus display encode into the exported lattice; `report.json` now records `reference_profile` and `export_domain`. Legacy jobs with `reference_profile` equal to a log `input_profile` still export the working lattice.
+- Premiere Pro MCP test on `chromainvert_playground` (CEP, Premiere 2025.0): manual grade still vs generated-LUT still on the same Apple Log source frame measured mean DeltaE2000 33.3 before the fix and 31.9 with the raw-log host cube, because Premiere color-manages the `Apple Log/Rec. 2020` clip to Rec.709 before Lumetri; a cube trained on Premiere-exported ungraded stills with a `rec709` job measured 7.28 and 7.38 after a Lumetri Browse re-pick, matching the FFmpeg `lut3d` result (legacy cube 26.0, fixed host cube 7.5). The MCP `apply_lut` path is unavailable on CEP and `set_effect_property` LUT path writes do not reliably load into the render (identity vs channel-swap rendered identically). Measured workflow recorded in `docs/PREMIERE_VALIDATION.md`.
+- Vibrance follow-up (same day): the distribution-only Premiere cube undersaturated against the manual grade (chroma p90 about 9 percent low in Premiere stills). Added the opt-in aligned-pair loss (`weight_paired` in `OptimizeConfig` and job files, with `sample_paired_pixels`) plus `weight_tv` and `weight_shadow` job keys; on a held-out frame of the same clip the paired configuration improved mean DeltaE2000 from 9.08 to 5.45 in deterministic CPU runs, while the default weights are unchanged, so synthetic benchmark behavior is unaffected (chart improvement 42 to 44 percent across deterministic runs, probe gate failing before and after). The final Premiere cube `work/apple_fix/premiere_apple_log_v5.cube` (paired-loss Premiere-domain cube blended for Premiere's measured saturation response) scored 6.06 and 6.11 mean DeltaE2000 in Premiere with mean chroma within 3 percent of the manual stills.
+
 ## 2026-11-02: data directory for training assets and weights (PR #34)
 
 Completed:

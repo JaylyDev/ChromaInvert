@@ -5,6 +5,10 @@ export interface JobConfig {
   customWeights: string;
   outputCube: string;
   inputProfile: string;
+  referenceProfile: string;
+  weightTv: number;
+  weightShadow: number;
+  weightPaired: number;
   strength: number;
   lutSize: number;
   coarseSize: number;
@@ -32,4 +36,20 @@ export interface ProgressUpdate {
 export interface DoneResult {
   exitCode: number;
   summary: string;
+}
+
+export interface VideoProbe {
+  path: string;
+  duration: number;
+  width: number;
+  height: number;
+  fps: string;
+  codec: string;
+  error: string;
+}
+
+export interface FrameGrab {
+  framePath: string;
+  timestamp: number;
+  error: string;
 }

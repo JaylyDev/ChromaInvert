@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { getBridge, isDesktop } from "./api";
-import type { JobConfig } from "./types";
+import type { JobConfig, VideoProbe } from "./types";
 import { RunPhase } from "./types";
 
 interface FrameListProps {
@@ -103,6 +103,52 @@ function badgeLabel(phase: RunPhase): string {
   return "Idle";
 }
 
+function toFileUrl(path: string): string {
+  return "file:///" + encodeURI(path.replace(/\\/g, "/")).replace(/#/g, "%23");
+}
+
+function formatSeconds(value: number): string {
+  if (!Number.isFinite(value) || value < 0) {
+    return "unknown";
+  }
+  return value.toFixed(2) + "s";
+}
+
+function dirOfCube(cubePath: string): string {
+  const trimmed = cubePath.trim();
+  const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+  const dir = cut <= 0 ? "" : trimmed.slice(0, cut);
+  return dir === "" ? "work" : dir;
+}
+
+function probeDuration(probe: VideoProbe | null): number {
+  if (probe === null || probe.error !== "") {
+    return -1;
+  }
+  return probe.duration;
+}
+
+function defaultReferenceProfile(profile: string): string {
+  if (profile === "apple_log" || profile.indexOf("slog3") === 0) {
+    return "rec709";
+  }
+  return profile;
+}
+
+function isLogProfile(profile: string): boolean {
+  return profile === "apple_log" || profile.indexOf("slog3") === 0;
+}
+
+function canonicalProfile(profile: string): string {
+  if (profile === "apple_log") {
+    return "apple_log";
+  }
+  if (profile.indexOf("slog3") === 0) {
+    return "slog3";
+  }
+  return profile;
+}
+
 export default function App(): JSX.Element {
   const [sourceFrames, setSourceFrames] = useState<string[]>([]);
   const [referenceFrames, setReferenceFrames] = useState<string[]>([]);
@@ -112,6 +158,10 @@ export default function App(): JSX.Element {
   const [referenceManual, setReferenceManual] = useState<string>("");
   const [outputCube, setOutputCube] = useState<string>("work/out.cube");
   const [inputProfile, setInputProfile] = useState<string>("rec709");
+  const [referenceProfile, setReferenceProfile] = useState<string>("auto");
+  const [weightTv, setWeightTv] = useState<number>(0.1);
+  const [weightShadow, setWeightShadow] = useState<number>(0.25);
+  const [alignedPairs, setAlignedPairs] = useState<boolean>(false);
   const [strength, setStrength] = useState<number>(1.0);
   const [lutSize, setLutSize] = useState<number>(33);
   const [coarseSize, setCoarseSize] = useState<number>(17);
@@ -128,10 +178,26 @@ export default function App(): JSX.Element {
   const [errors, setErrors] = useState<string[]>([]);
   const [log, setLog] = useState<string>("");
   const logRef = useRef<HTMLPreElement | null>(null);
+  const [sourceVideo, setSourceVideo] = useState<string>("");
+  const [referenceVideo, setReferenceVideo] = useState<string>("");
+  const [sourceProbe, setSourceProbe] = useState<VideoProbe | null>(null);
+  const [referenceProbe, setReferenceProbe] = useState<VideoProbe | null>(null);
+  const [sourceTime, setSourceTime] = useState<number>(0);
+  const [referenceTime, setReferenceTime] = useState<number>(0);
+  const [lockTimes, setLockTimes] = useState<boolean>(true);
+  const [grabbing, setGrabbing] = useState<string>("");
+  const [videoNote, setVideoNote] = useState<string>("");
+  const sourceVidRef = useRef<HTMLVideoElement | null>(null);
+  const referenceVidRef = useRef<HTMLVideoElement | null>(null);
 
   const running = phase === RunPhase.Running;
   const desktop = isDesktop();
+  const sourceDur = probeDuration(sourceProbe);
+  const refDur = probeDuration(referenceProbe);
+  const lengthDelta = sourceDur > 0 && refDur > 0 ? Math.abs(sourceDur - refDur) : -1;
+  const lengthsMatch = lengthDelta >= 0 && lengthDelta <= 0.5;
   const contractVersion = inputProfile.indexOf("slog3") === 0 ? 2 : 1;
+  const resolvedReference = referenceProfile === "auto" ? defaultReferenceProfile(inputProfile) : referenceProfile;
   const footageDone =
     (referenceOnly || sourceFrames.length > 0) && referenceFrames.length > 0;
   const outputDone = outputCube.trim().toLowerCase().endsWith(".cube");
@@ -139,6 +205,16 @@ export default function App(): JSX.Element {
     Number.isFinite(strength) &&
     strength >= 0 &&
     strength <= 1 &&
+    (referenceProfile === "auto" ||
+      referenceProfile === "rec709" ||
+      referenceProfile === "rec2020" ||
+      referenceProfile === "apple_log" ||
+      referenceProfile === "slog3" ||
+      referenceProfile === "slog3_sgamut3cine") &&
+    Number.isFinite(weightTv) &&
+    weightTv >= 0 &&
+    Number.isFinite(weightShadow) &&
+    weightShadow >= 0 &&
     Number.isInteger(lutSize) &&
     lutSize >= 2 &&
     Number.isInteger(coarseSize) &&
@@ -201,6 +277,25 @@ export default function App(): JSX.Element {
     if (!Number.isFinite(strength) || strength < 0 || strength > 1) {
       found.push("Strength must be a number between 0 and 1.");
     }
+    if (
+      referenceProfile !== "auto" &&
+      referenceProfile !== "rec709" &&
+      referenceProfile !== "rec2020" &&
+      referenceProfile !== "apple_log" &&
+      referenceProfile !== "slog3" &&
+      referenceProfile !== "slog3_sgamut3cine"
+    ) {
+      found.push("Reference profile must be Auto, rec709, rec2020, apple_log, slog3, or slog3_sgamut3cine.");
+    }
+    if (isLogProfile(referenceProfile) && canonicalProfile(referenceProfile) !== canonicalProfile(inputProfile)) {
+      found.push("Reference profile is a log profile: graded references must use a display profile such as rec709.");
+    }
+    if (!Number.isFinite(weightTv) || weightTv < 0) {
+      found.push("Smoothness weight must be a number of 0 or more.");
+    }
+    if (!Number.isFinite(weightShadow) || weightShadow < 0) {
+      found.push("Shadow weight must be a number of 0 or more.");
+    }
     if (!Number.isInteger(lutSize) || lutSize < 2) {
       found.push("LUT size must be an integer of at least 2 (17 or 33 typical).");
     }
@@ -230,6 +325,10 @@ export default function App(): JSX.Element {
       customWeights: customWeights.trim(),
       outputCube: outputCube.trim(),
       inputProfile,
+      referenceProfile,
+      weightTv,
+      weightShadow,
+      weightPaired: alignedPairs ? 10 : 0,
       strength,
       lutSize,
       coarseSize,
@@ -273,6 +372,196 @@ export default function App(): JSX.Element {
       },
       () => {
         setStatus("Reference file dialog was unavailable.");
+      }
+    );
+  };
+
+  const refreshProbe = (kind: string, videoPath: string): void => {
+    const bridge = getBridge();
+    if (bridge === null || videoPath.trim() === "") {
+      return;
+    }
+    bridge.probeVideo(videoPath).then(
+      (probe) => {
+        if (kind === "source") {
+          setSourceProbe(probe);
+          if (probe.error === "" && probe.duration > 0) {
+            setSourceTime((prev) => Math.min(Math.max(prev, 0), probe.duration));
+          }
+        } else {
+          setReferenceProbe(probe);
+          if (probe.error === "" && probe.duration > 0) {
+            setReferenceTime((prev) => Math.min(Math.max(prev, 0), probe.duration));
+          }
+        }
+      },
+      () => {
+        const failed: VideoProbe = {
+          path: videoPath,
+          duration: -1,
+          width: 0,
+          height: 0,
+          fps: "unknown",
+          codec: "unknown",
+          error: "Probe was unavailable."
+        };
+        if (kind === "source") {
+          setSourceProbe(failed);
+        } else {
+          setReferenceProbe(failed);
+        }
+      }
+    );
+  };
+
+  const onBrowseSourceVideo = (): void => {
+    const bridge = getBridge();
+    if (bridge === null) {
+      setVideoNote("Video import needs the Electron app.");
+      return;
+    }
+    bridge.pickSourceVideo().then(
+      (picked) => {
+        if (picked !== null && picked !== "") {
+          setSourceVideo(picked);
+          setSourceProbe(null);
+          refreshProbe("source", picked);
+        }
+      },
+      () => {
+        setVideoNote("Source video dialog was unavailable.");
+      }
+    );
+  };
+
+  const onBrowseReferenceVideo = (): void => {
+    const bridge = getBridge();
+    if (bridge === null) {
+      setVideoNote("Video import needs the Electron app.");
+      return;
+    }
+    bridge.pickReferenceVideo().then(
+      (picked) => {
+        if (picked !== null && picked !== "") {
+          setReferenceVideo(picked);
+          setReferenceProbe(null);
+          refreshProbe("reference", picked);
+        }
+      },
+      () => {
+        setVideoNote("Reference video dialog was unavailable.");
+      }
+    );
+  };
+
+  const onVideoSeek = (kind: string, value: number): void => {
+    const safe = Number.isFinite(value) && value >= 0 ? value : 0;
+    if (lockTimes) {
+      const sourceDur = probeDuration(sourceProbe);
+      const refDur = probeDuration(referenceProbe);
+      setSourceTime(sourceDur > 0 ? Math.min(safe, sourceDur) : safe);
+      setReferenceTime(refDur > 0 ? Math.min(safe, refDur) : safe);
+      if (sourceVidRef.current !== null) {
+        sourceVidRef.current.currentTime = sourceDur > 0 ? Math.min(safe, sourceDur) : safe;
+      }
+      if (referenceVidRef.current !== null) {
+        referenceVidRef.current.currentTime = refDur > 0 ? Math.min(safe, refDur) : safe;
+      }
+      return;
+    }
+    if (kind === "source") {
+      const dur = probeDuration(sourceProbe);
+      const clamped = dur > 0 ? Math.min(safe, dur) : safe;
+      setSourceTime(clamped);
+      if (sourceVidRef.current !== null) {
+        sourceVidRef.current.currentTime = clamped;
+      }
+    } else {
+      const dur = probeDuration(referenceProbe);
+      const clamped = dur > 0 ? Math.min(safe, dur) : safe;
+      setReferenceTime(clamped);
+      if (referenceVidRef.current !== null) {
+        referenceVidRef.current.currentTime = clamped;
+      }
+    }
+  };
+
+  const captureFrame = (kind: string, atTime: number): void => {
+    const bridge = getBridge();
+    const videoPath = kind === "source" ? sourceVideo : referenceVideo;
+    if (bridge === null) {
+      setVideoNote("Frame capture needs the Electron app.");
+      return;
+    }
+    if (videoPath.trim() === "") {
+      setVideoNote("Pick a " + kind + " video first.");
+      return;
+    }
+    setGrabbing(kind);
+    setVideoNote("Grabbing " + kind + " frame at " + atTime.toFixed(2) + "s.");
+    bridge.grabFrame(videoPath, atTime, kind, dirOfCube(outputCube)).then(
+      (grab) => {
+        setGrabbing("");
+        if (grab.error !== "") {
+          setVideoNote(kind + " capture failed: " + grab.error);
+          return;
+        }
+        if (kind === "source") {
+          setSourceFrames((prev) => dedupeAppend(prev, [grab.framePath]));
+        } else {
+          setReferenceFrames((prev) => dedupeAppend(prev, [grab.framePath]));
+        }
+        setVideoNote("Captured " + kind + " frame at " + grab.timestamp.toFixed(2) + "s.");
+      },
+      () => {
+        setGrabbing("");
+        setVideoNote(kind + " capture was unavailable.");
+      }
+    );
+  };
+
+  const captureBoth = (): void => {
+    const bridge = getBridge();
+    if (bridge === null) {
+      setVideoNote("Frame capture needs the Electron app.");
+      return;
+    }
+    if (sourceVideo.trim() === "" || referenceVideo.trim() === "") {
+      setVideoNote("Pick both videos first.");
+      return;
+    }
+    const at = refDur > 0 ? Math.min(sourceTime, refDur) : sourceTime;
+    const clampedSource = sourceDur > 0 ? Math.min(at, sourceDur) : at;
+    const outDir = dirOfCube(outputCube);
+    setGrabbing("both");
+    setVideoNote("Grabbing both frames at " + at.toFixed(2) + "s.");
+    bridge.grabFrame(sourceVideo, clampedSource, "source", outDir).then(
+      (src) => {
+        if (src.error !== "") {
+          setGrabbing("");
+          setVideoNote("Source capture failed: " + src.error);
+          return;
+        }
+        setSourceFrames((prev) => dedupeAppend(prev, [src.framePath]));
+        bridge.grabFrame(referenceVideo, at, "reference", outDir).then(
+          (ref) => {
+            setGrabbing("");
+            if (ref.error !== "") {
+              setVideoNote("Reference capture failed: " + ref.error);
+              return;
+            }
+            setReferenceFrames((prev) => dedupeAppend(prev, [ref.framePath]));
+            setVideoNote("Captured both at " + at.toFixed(2) + "s.");
+          },
+          () => {
+            setGrabbing("");
+            setVideoNote("Reference capture was unavailable.");
+          }
+        );
+      },
+      () => {
+        setGrabbing("");
+        setVideoNote("Source capture was unavailable.");
       }
     );
   };
@@ -361,6 +650,103 @@ export default function App(): JSX.Element {
     );
   };
 
+  const renderVideoBlock = (kind: string): JSX.Element => {
+    const isSource = kind === "source";
+    const videoPath = isSource ? sourceVideo : referenceVideo;
+    const probe = isSource ? sourceProbe : referenceProbe;
+    const time = isSource ? sourceTime : referenceTime;
+    const dur = isSource ? sourceDur : refDur;
+    const vidRef = isSource ? sourceVidRef : referenceVidRef;
+    const onBrowse = isSource ? onBrowseSourceVideo : onBrowseReferenceVideo;
+    const onClear = (): void => {
+      if (isSource) {
+        setSourceVideo("");
+        setSourceProbe(null);
+      } else {
+        setReferenceVideo("");
+        setReferenceProbe(null);
+      }
+    };
+    const meta =
+      probe === null
+        ? "No probe yet. Browse a file to read duration."
+        : probe.error !== ""
+          ? probe.error
+          : probe.width + "x" + probe.height + " " + probe.codec + " " + probe.fps + " fps, " + formatSeconds(probe.duration);
+    return (
+      <div className="video-block">
+        <span className="video-title">{isSource ? "Source video (ungraded)" : "Reference video (graded)"}</span>
+        <div className="row">
+          <button type="button" onClick={onBrowse} disabled={running}>
+            Browse video
+          </button>
+          <button type="button" className="ghost" onClick={onClear} disabled={running || videoPath === ""}>
+            Clear
+          </button>
+        </div>
+        {videoPath === "" ? (
+          <div className="empty">No video selected yet.</div>
+        ) : (
+          <div className="file-item">
+            <code title={videoPath}>{videoPath}</code>
+          </div>
+        )}
+        <div className="hint">{meta}</div>
+        {videoPath !== "" && desktop && (
+          <video
+            key={videoPath}
+            ref={vidRef}
+            className="video-preview"
+            src={toFileUrl(videoPath)}
+            controls
+            preload="metadata"
+            onTimeUpdate={(e) => {
+              if (!lockTimes) {
+                if (isSource) {
+                  setSourceTime(e.currentTarget.currentTime);
+                } else {
+                  setReferenceTime(e.currentTarget.currentTime);
+                }
+              }
+            }}
+          />
+        )}
+        <div className="row">
+          <input
+            className="grow"
+            type="range"
+            min={0}
+            max={dur > 0 ? dur : 100}
+            step={0.04}
+            value={dur > 0 ? Math.min(time, dur) : time}
+            aria-label={(isSource ? "Source" : "Reference") + " video timestamp"}
+            disabled={running || videoPath === "" || dur <= 0}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => onVideoSeek(kind, Number(e.target.value))}
+          />
+          <input
+            type="number"
+            min={0}
+            max={dur > 0 ? dur : undefined}
+            step={0.1}
+            value={Number(time.toFixed(2))}
+            aria-label={(isSource ? "Source" : "Reference") + " timestamp seconds"}
+            disabled={running || videoPath === ""}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => onVideoSeek(kind, Number(e.target.value))}
+          />
+        </div>
+        <div className="row">
+          <button
+            type="button"
+            onClick={() => captureFrame(kind, time)}
+            disabled={running || grabbing !== "" || videoPath === ""}
+          >
+            {grabbing === kind ? "Grabbing..." : "Capture frame at " + time.toFixed(2) + "s"}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="app">
       <header className="header">
@@ -438,6 +824,54 @@ export default function App(): JSX.Element {
             />
           </section>
 
+          <section className="card" aria-label="Video import">
+            <h2>Video import</h2>
+            <p className="hint">
+              Import the ungraded and graded videos, scrub to a frame, then capture it into the frame lists
+              above. Captures land in video_frames next to the output cube.
+            </p>
+            {!desktop && (
+              <div className="notice">
+                Video preview and capture need the Electron app. Manual frame paths still validate here.
+              </div>
+            )}
+            <div className="video-grid">
+              {renderVideoBlock("source")}
+              {renderVideoBlock("reference")}
+            </div>
+            <div className="field">
+              <span>Length match</span>
+              <span className="hint">
+                Source {formatSeconds(sourceDur)}, reference {formatSeconds(refDur)}
+                {lengthDelta >= 0 ? ", delta " + lengthDelta.toFixed(2) + "s" : ". Capture needs both durations."}
+              </span>
+              {lengthDelta >= 0 && (
+                <span className={lengthsMatch ? "length-ok" : "length-warn"}>
+                  {lengthsMatch ? "Lengths match." : "Lengths differ: captures still work, compare the same moment."}
+                </span>
+              )}
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={lockTimes}
+                  disabled={running}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setLockTimes(e.target.checked)}
+                />
+                Lock timestamps (scrub and capture the same moment in both videos)
+              </label>
+              <div className="row">
+                <button
+                  type="button"
+                  onClick={captureBoth}
+                  disabled={running || grabbing !== "" || sourceVideo === "" || referenceVideo === ""}
+                >
+                  {grabbing !== "" ? "Grabbing..." : "Capture both at matched time"}
+                </button>
+              </div>
+              {videoNote !== "" && <span className="hint">{videoNote}</span>}
+            </div>
+          </section>
+
           <section className="card" aria-label="Output">
             <h2>
               <span className="step-num" aria-hidden="true">
@@ -471,7 +905,7 @@ export default function App(): JSX.Element {
               </span>
               Grade settings
             </h2>
-            <p className="hint">Profile decodes both sides. Strength blends back toward identity.</p>
+            <p className="hint">Source profile decodes source frames. Reference profile decodes the graded reference: keep Auto (rec709 for log sources such as Apple Log). Strength blends back toward identity.</p>
             <label className="check">
               <input
                 type="checkbox"
@@ -501,7 +935,7 @@ export default function App(): JSX.Element {
             )}
             <div className="grid2">
               <label className="field">
-                <span>Input profile</span>
+                <span>Input profile (source)</span>
                 <select
                   value={inputProfile}
                   disabled={running}
@@ -514,6 +948,47 @@ export default function App(): JSX.Element {
                   <option value="slog3_sgamut3cine">slog3_sgamut3cine</option>
                 </select>
               </label>
+              <label className="field">
+                <span>Reference profile (graded)</span>
+                <select
+                  value={referenceProfile}
+                  disabled={running}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setReferenceProfile(e.target.value)}
+                >
+                  <option value="auto">Auto ({defaultReferenceProfile(inputProfile)})</option>
+                  <option value="rec709">rec709</option>
+                  <option value="rec2020">rec2020</option>
+                  <option value="apple_log">apple_log</option>
+                  <option value="slog3">slog3</option>
+                  <option value="slog3_sgamut3cine">slog3_sgamut3cine</option>
+                </select>
+              </label>
+            </div>
+            {isLogProfile(inputProfile) && (
+              <p className="hint">
+                Apple Log and S-Log3 export a host-domain cube: it applies directly to the log footage in
+                Premiere or FFmpeg with no extra conversion. Graded references stay display-referred, so keep
+                the reference profile on rec709.
+              </p>
+            )}
+            {isLogProfile(resolvedReference) && (
+              <p className="hint">
+                Reference profile is a log profile: the graded reference will be decoded as log and the cube
+                exports in legacy working-domain mode, which does not match in Premiere. Use Auto (rec709)
+                unless you need the legacy path.
+              </p>
+            )}
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={alignedPairs}
+                disabled={running}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setAlignedPairs(e.target.checked)}
+              />
+              Same-frame pairs: source and reference are the same frames before and after grading (for
+              example Capture both at matched time). Restores saturation on Apple Log grades.
+            </label>
+            <div className="grid2">
               <label className="field">
                 <span>Device</span>
                 <select
@@ -607,6 +1082,34 @@ export default function App(): JSX.Element {
                   />
                 </label>
               </div>
+              <div className="grid2">
+                <label className="field">
+                  <span>Smoothness weight</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={weightTv}
+                    disabled={running}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setWeightTv(Number(e.target.value))
+                    }
+                  />
+                </label>
+                <label className="field">
+                  <span>Shadow weight</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={weightShadow}
+                    disabled={running}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setWeightShadow(Number(e.target.value))
+                    }
+                  />
+                </label>
+              </div>
               <label className="check">
                 <input
                   type="checkbox"
@@ -630,7 +1133,8 @@ export default function App(): JSX.Element {
             </h2>
             <p className="hint">
               {referenceOnly ? "reference-only" : sourceFrames.length + " source,"} {referenceFrames.length}{" "}
-              reference, contract v{contractVersion}, {device}, LUT {lutSize}.
+              reference, {inputProfile} to {resolvedReference}, contract v{contractVersion}, {device}, LUT{" "}
+              {lutSize}.
             </p>
             {errors.length > 0 && (
               <div className="errors" role="alert">
