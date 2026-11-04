@@ -1,10 +1,14 @@
-import type { DoneResult, JobConfig, ProgressUpdate } from "./types";
+import type { DoneResult, FrameGrab, JobConfig, ProgressUpdate, VideoProbe } from "./types";
 
 export interface GuiBridge {
   runJob: (config: JobConfig) => Promise<DoneResult>;
   cancelJob: () => Promise<void>;
   pickSourceFrames: () => Promise<string[]>;
   pickReferenceFrames: () => Promise<string[]>;
+  pickSourceVideo: () => Promise<string | null>;
+  pickReferenceVideo: () => Promise<string | null>;
+  probeVideo: (videoPath: string) => Promise<VideoProbe>;
+  grabFrame: (videoPath: string, timestamp: number, kind: string, outputDir: string) => Promise<FrameGrab>;
   pickOutputCube: (suggestedPath: string) => Promise<string | null>;
   pickWeights: () => Promise<string | null>;
   onProgress: (cb: (update: ProgressUpdate) => void) => void;
