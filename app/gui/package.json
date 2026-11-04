@@ -45,11 +45,12 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
+      "assets/icon.png",
+      "assets/icon.ico",
       "package.json"
     ],
-
-    "win": { "target": ["nsis", "portable"], "signAndEditExecutable": false },
-    "mac": { "target": ["dmg", "zip"] },
-    "linux": { "target": ["AppImage", "deb"] }
+    "win": { "target": ["nsis", "portable"], "signAndEditExecutable": false, "icon": "assets/icon.ico" },
+    "mac": { "target": ["dmg", "zip"], "icon": "assets/icon.png" },
+    "linux": { "target": ["AppImage", "deb"], "icon": "assets/icon.png" }
   }
 }

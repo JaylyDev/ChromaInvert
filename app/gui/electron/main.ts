@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, Menu, dialog, ipcMain } from "electron";
 import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { mkdir, stat, writeFile } from "node:fs/promises";
@@ -261,8 +261,11 @@ function createWindow(): void {
     minWidth: 960,
     minHeight: 640,
     title: "ChromaInvert",
+    autoHideMenuBar: true,
+    icon: join(here, "../../assets/icon.png"),
     webPreferences: { preload: join(here, "preload.js") }
   });
+  win.setMenu(null);
   const devUrl = process.env.VITE_DEV_SERVER_URL;
   if (devUrl !== undefined && devUrl !== "") {
     void win.loadURL(devUrl);
@@ -482,6 +485,7 @@ ipcMain.handle("job:cancel", (): Promise<void> => {
 });
 
 void app.whenReady().then(() => {
+  Menu.setApplicationMenu(null);
   createWindow();
 });
 
