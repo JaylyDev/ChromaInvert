@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
-import type { DoneResult, FrameGrab, JobConfig, ProgressUpdate, VideoProbe } from "../src/types";
+import type { DoneResult, FrameGrab, JobConfig, ProgressUpdate, VideoProbe } from "./types";
 
 contextBridge.exposeInMainWorld("chromainvert", {
   runJob: (config: JobConfig): Promise<DoneResult> => ipcRenderer.invoke("job:run", config),

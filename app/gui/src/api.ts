@@ -1,4 +1,4 @@
-import type { DoneResult, FrameGrab, JobConfig, ProgressUpdate, VideoProbe } from "./types";
+import type { DoneResult, FrameGrab, JobConfig, ProgressUpdate, VideoProbe } from "../electron/types";
 
 export interface GuiBridge {
   runJob: (config: JobConfig) => Promise<DoneResult>;

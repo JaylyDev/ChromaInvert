@@ -380,7 +380,6 @@ release/
 
 # ChromaInvert project outputs
 work/
-dist-electron/
 app/gui/engine-bin/*
 !app/gui/engine-bin/README.md
 /data/videos/apple_log/*

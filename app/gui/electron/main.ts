@@ -6,7 +6,7 @@ import { dirname, join, resolve as resolvePath } from "node:path";
 import ffmpegStaticPath from "ffmpeg-static";
 import { path as ffprobeStaticPath } from "ffprobe-static";
 import type { FileFilter, IpcMainInvokeEvent } from "electron";
-import type { DoneResult, FrameGrab, JobConfig, ProgressUpdate, VideoProbe } from "../src/types";
+import type { DoneResult, FrameGrab, JobConfig, ProgressUpdate, VideoProbe } from "./types";
 
 interface ProgressLine {
   event: string;
@@ -384,7 +384,7 @@ function createWindow(): void {
   if (devUrl !== undefined && devUrl !== "") {
     void win.loadURL(devUrl);
   } else {
-    void win.loadFile(join(here, "../../dist/index.html"));
+    void win.loadFile(join(here, "../index.html"));
   }
 }
 

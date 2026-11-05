@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { getBridge, isDesktop } from "./api";
-import type { JobConfig, VideoProbe } from "./types";
-import { RunPhase } from "./types";
+import type { JobConfig, VideoProbe } from "../electron/types";
+import { RunPhase } from "../electron/types";
 
 interface FrameListProps {
   title: string;
