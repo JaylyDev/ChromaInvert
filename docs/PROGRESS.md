@@ -1,5 +1,11 @@
 # ChromaInvert Progress Log
 
+## 2026-11-05: GUI first-run environment setup with progress
+
+Completed:
+- New Environment card: on launch the GUI probes system Python (`import chromainvert`, torch version plus CUDA) and, when the engine is missing and no bundled binary is staged, offers one-click `pip install chromainvert` with a live progress bar parsed from pip output, cancellable, with the pip tail on failure. Bundled-engine users never see the card.
+- Wiring: `env:check`/`env:setup`/`env:cancel` IPC plus `setup:progress`/`setup:log` events, bridge and shared types, `missingToolMessage` pointing at the setup panel. Verified `typecheck` plus `build`; probe JSON contract checked headlessly (`engineOk false`, torch `2.8.0+cu129` CUDA true); `pip install chromainvert` correctly reports no distribution until the PyPI publish lands.
+
 ## 2026-11-05: Engine bundle switches to directory mode
 
 Completed:

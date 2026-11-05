@@ -6,7 +6,7 @@ import { dirname, join, resolve as resolvePath } from "node:path";
 import ffmpegStaticPath from "ffmpeg-static";
 import { path as ffprobeStaticPath } from "ffprobe-static";
 import type { FileFilter, IpcMainInvokeEvent } from "electron";
-import type { DoneResult, FrameGrab, JobConfig, ProgressUpdate, VideoProbe } from "./types";
+import type { DoneResult, EnvStatus, FrameGrab, JobConfig, ProgressUpdate, SetupProgress, VideoProbe } from "./types";
 
 interface ProgressLine {
   event: string;
@@ -331,11 +331,96 @@ function resolveTool(kind: ToolKind): Promise<ToolResolution | null> {
 
 function missingToolMessage(kind: ToolKind): string {
   if (kind === ToolKind.Engine) {
-    return "No engine found: reinstall the bundled ChromaInvert release, put chromainvert-engine on PATH, or install Python plus the engine (pip install -e ./engine).";
+    return "No engine found: press Install in the Environment setup to fetch it from PyPI, or reinstall the bundled ChromaInvert release.";
   }
   const name = kind === ToolKind.Ffmpeg ? "ffmpeg" : "ffprobe";
   return name + " was not found: reinstall the bundled ChromaInvert app, which ships " + name + ", or install FFmpeg and put it on PATH.";
 }
+
+interface EnvProbe {
+  engineOk: boolean;
+  engineVersion: string;
+  torchOk: boolean;
+  torchVersion: string;
+  cuda: boolean;
+}
+
+const ENV_PROBE = [
+  "import json",
+  "out = {'engineOk': False, 'engineVersion': '', 'torchOk': False, 'torchVersion': '', 'cuda': False}",
+  "try:",
+  "    import importlib.metadata as m",
+  "    try:",
+  "        out['engineVersion'] = m.version('chromainvert')",
+  "    except Exception:",
+  "        out['engineVersion'] = 'unknown'",
+  "    import chromainvert",
+  "    out['engineOk'] = True",
+  "except Exception:",
+  "    pass",
+  "try:",
+  "    import torch",
+  "    out['torchOk'] = True",
+  "    out['torchVersion'] = torch.__version__",
+  "    out['cuda'] = bool(torch.cuda.is_available())",
+  "except Exception:",
+  "    pass",
+  "print(json.dumps(out))"
+].join("\n");
+
+function emptyEnvStatus(python: string): EnvStatus {
+  return { python, engineOk: false, engineVersion: "", torchOk: false, torchVersion: "", cuda: false };
+}
+
+function toEnvStatus(python: string, value: unknown): EnvStatus {
+  const rec = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+  const text = (key: string): string => (typeof rec[key] === "string" ? String(rec[key]) : "");
+  const flag = (key: string): boolean => rec[key] === true;
+  return {
+    python,
+    engineOk: flag("engineOk"),
+    engineVersion: text("engineVersion"),
+    torchOk: flag("torchOk"),
+    torchVersion: text("torchVersion"),
+    cuda: flag("cuda")
+  };
+}
+
+function checkEnv(): Promise<EnvStatus> {
+  const bundled = bundledEnginePath();
+  return isFile(bundled).then((present): Promise<EnvStatus> => {
+    const bundledStatus = (python: string): EnvStatus => ({
+      python,
+      engineOk: true,
+      engineVersion: "bundled",
+      torchOk: false,
+      torchVersion: "",
+      cuda: false
+    });
+    if (!onPath("python")) {
+      return Promise.resolve(present ? bundledStatus("") : emptyEnvStatus(""));
+    }
+    const probed = spawnSync("python", ["-c", ENV_PROBE], { encoding: "utf8" });
+    if (probed.status !== 0) {
+      return Promise.resolve(present ? bundledStatus("python") : emptyEnvStatus("python"));
+    }
+    return Promise.resolve(String(probed.stdout)).then(
+      (text: string): unknown => JSON.parse(text)
+    ).then(
+      (value: unknown): EnvStatus => {
+        const status = toEnvStatus("python", value);
+        if (present) {
+          status.engineOk = true;
+          status.engineVersion = "bundled";
+        }
+        return status;
+      },
+      (): EnvStatus => (present ? bundledStatus("python") : emptyEnvStatus("python"))
+    );
+  });
+}
+
+let setupChild: ChildProcess | null = null;
 
 let currentChild: ChildProcess | null = null;
 
@@ -612,6 +697,89 @@ ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promi
 ipcMain.handle("job:cancel", (): Promise<void> => {
   currentChild?.kill();
   currentChild = null;
+  return Promise.resolve();
+});
+
+ipcMain.handle(
+  "env:check",
+  (): Promise<EnvStatus> => checkEnv()
+);
+
+// One-shot first-run setup: `pip install chromainvert` (engine plus torch,
+// numpy, imageio) with best-effort percent parsing from pip output.
+ipcMain.handle("env:setup", (event: IpcMainInvokeEvent): Promise<DoneResult> => {
+  const sender = event.sender;
+  if (!onPath("python")) {
+    return Promise.resolve({ exitCode: 1, summary: "Python was not found on PATH. Install Python 3.10 or newer, then reopen the app." });
+  }
+  setupChild?.kill();
+  setupChild = null;
+  sender.send("setup:log", "Installing chromainvert from PyPI (engine plus torch, numpy, imageio). This can take several minutes.");
+  return new Promise<DoneResult>((resolve) => {
+    const child: ChildProcess = spawn("python", ["-m", "pip", "install", "chromainvert"], {
+      cwd: process.cwd()
+    });
+    setupChild = child;
+    let tail = "";
+    let settled = false;
+    const finish = (result: DoneResult): void => {
+      if (!settled) {
+        settled = true;
+        setupChild = null;
+        resolve(result);
+      }
+    };
+    const push = (text: string): void => {
+      tail = (tail + text).slice(-4000);
+      for (const line of text.split("\n")) {
+        const trimmed = line.trim();
+        if (trimmed === "") {
+          continue;
+        }
+        sender.send("setup:log", trimmed.slice(-300));
+        const found = /(\d{1,3})%/.exec(trimmed);
+        if (found !== null) {
+          const pct = Math.max(0, Math.min(100, Number(found[1])));
+          const update: SetupProgress = { percent: pct };
+          sender.send("setup:progress", update);
+        }
+      }
+    };
+    child.stdout?.on("data", (chunk: Buffer) => {
+      push(chunk.toString("utf8"));
+    });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      push(chunk.toString("utf8"));
+    });
+    child.on("error", (err: Error) => {
+      finish({ exitCode: 1, summary: "Setup failed to start pip: " + err.message });
+    });
+    child.on("close", (code: number | null) => {
+      const exitCode = code ?? 1;
+      if (exitCode !== 0) {
+        finish({ exitCode, summary: "Setup failed: " + tail.slice(-500) });
+        return;
+      }
+      checkEnv().then(
+        (status: EnvStatus): void => {
+          if (status.engineOk) {
+            const torch = status.torchOk ? "torch " + status.torchVersion + (status.cuda ? " (CUDA)" : " (CPU)") : "torch missing";
+            finish({ exitCode: 0, summary: "Done: engine " + status.engineVersion + ", " + torch });
+          } else {
+            finish({ exitCode: 1, summary: "pip finished but the engine still does not import. See the setup log." });
+          }
+        },
+        (): void => {
+          finish({ exitCode: 1, summary: "pip finished but the environment check failed. See the setup log." });
+        }
+      );
+    });
+  });
+});
+
+ipcMain.handle("env:cancel", (): Promise<void> => {
+  setupChild?.kill();
+  setupChild = null;
   return Promise.resolve();
 });
 
