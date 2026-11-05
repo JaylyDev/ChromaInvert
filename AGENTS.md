@@ -4,7 +4,7 @@ ChromaInvert is a perceptual video and LUT reverse-engineering engine. Matching 
 
 ## What this repo is
 
-Python engine plus Electron GUI monorepo. Python source lives under `engine/src/chromainvert/`, tests under `engine/tests/`. Planning docs live in `docs/`, helper scripts in `scripts/`, test footage notes in `assets/`, and the Electron product GUI in `app/gui/`. `work/` and `.venv/` are gitignored runtime and environment directories.
+Python engine plus Electron GUI monorepo. Python source lives under `engine/src/chromainvert/`, tests under `engine/tests/`. Planning docs live in `docs/`, helper scripts in `scripts/`, test footage notes plus the README GUI screenshot (`assets/gui-screenshot.png`) in `assets/`, and the Electron product GUI in `app/gui/`. `work/` and `.venv/` are gitignored runtime and environment directories.
 
 ## Parts of the project
 
