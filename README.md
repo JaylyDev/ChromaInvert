@@ -1,41 +1,103 @@
 # ChromaInvert
 
-Perceptual video and LUT reverse engineering engine. It recovers a smooth 3D LUT that matches source footage to a reference grade, then exports a portable `.cube` file.
+Video LUT reverse engineering. It takes source footage and a reference grade and writes a smooth 33x 3D LUT as `.cube` that loads in FFmpeg, Resolve, and Premiere Pro.
 
-Built using Meta's proprietary and open weights models for the Meta Global AI Developer Hackathon (Oct 26 – Nov 4, 2026), Indie Dev Track.
+Built for the Meta Global AI Developer Hackathon (Oct 26 to Nov 4, 2026), Indie track. Team Jayly. License: Apache-2.0.
 
-## Layout
+## Meta Global AI Hackathon 2026: submission overview
 
-- `engine/`: Python color engine (differentiable LUT, losses, `.cube` I/O)
-- `app/`: Electron + React product GUI (video import, Match, progress, `.cube` export)
-- `assets/`: test footage and reference frames, sources noted in `assets/SOURCES.md`
-- `scripts/`: validation and benchmark helpers
-- `docs/`: architecture and planning documents
-- `work/`: gitignored runtime scratch directory
+- Track and problem statement: Indie Developer, Build for Your World. Portable color matching for creators and small post houses.
+- Provenance (Oct 26 to Nov 4, 2026): built 100 percent from scratch during the hackathon window.
+- Meta AI usage: Muse Spark series wrote the engine and GUI code. Muse Wonder reviewed architecture and PRs (see `docs/PROGRESS.md`). The grading run itself is local (PyTorch plus FFmpeg) with no model API calls and no network.
+- Bonus prize targeted: Best Creative Build.
+- Demo video (3 min): https://www.youtube.com/watch?v=0d8jhrCcYSA
+- Keyless check: `python scripts/run_benchmark.py` runs with no footage, no GPU, and no keys. It gates on 40 percent DeltaE2000 improvement.
+- Repo: https://github.com/JaylyDev/ChromaInvert, one self-contained public repo.
+
+## Why this exists
+
+Hand grading a log clip to match a film still takes hours. Per frame style transfer is fast but it edits each frame on its own, so flat areas flicker. A 3D LUT is one fixed map from input color to output color. The same input gives the same output on every frame, so the result is stable and it loads in normal editors.
+
+## Results
+
+Measured Oct 29, 2026 on internal video footage, an RTX GPU. Optimiser run: 400 coarse steps plus 30 fine steps. Re-measure on the demo machine.
+
+| Check                               | Number                                                                  |
+| ----------------------------------- | ----------------------------------------------------------------------- |
+| Synthetic recovery, held out frames | Baseline 4.04, recovered 2.06 mean DeltaE2000, 48.9 percent improvement |
+| End to end                          | 31.1s total (extract 2.9, optimize 12.5, export 6.9, benchmark 6.3)     |
+| Smoothness                          | max neighbor delta 0.161, no banding on ramp test                       |
+| Python vs FFmpeg trilinear          | Mean DeltaE2000 0.22 to 0.26                                            |
+
+Full gates and probe numbers are in `report.json` and `docs/PREMIERE_VALIDATION.md`.
 
 ## Quickstart
 
-1. Install Python 3.10 or newer with `ffmpeg` on PATH.
-2. `python -m venv .venv --system-site-packages`
-3. `.venv\Scripts\Activate.ps1`
-4. `python -m pip install -e ./engine`
-5. `python -m pytest engine/tests -q`
-6. `python scripts/validate_cube.py`
+Start with the app. Grab the installer from GitHub Releases and launch ChromaInvert. Pick a source clip and a reference frame. Choose the output `.cube` path and press Match. The packaged app needs nothing else: the engine and FFmpeg ship inside it.
 
-## Real footage quickstart
+![ChromaInvert GUI showing video import and run panels](assets/gui-screenshot.png)
 
-1. Create the frame directories: `New-Item -ItemType Directory -Force work/frames/source, work/frames/reference`
-2. Extract a source frame from a Rec709 clip: `ffmpeg -y -ss 0 -i <clip> -frames:v 1 -q:v 2 work/frames/source/source_001.png`
-3. Build a warm graded reference with FFmpeg (or extract one from a graded clip) and save to `work/frames/reference/ref_001.png`: `ffmpeg -y -i work/frames/source/source_001.png -vf "colorbalance=rs=0.15:bs=-0.15,eq=saturation=1.2" -frames:v 1 -q:v 2 work/frames/reference/ref_001.png`
-4. Create `work/job.json` (see `assets/job.json.example`; frame names match `source_001.png` and `ref_001.png`) with `input_profile` set to `rec709`.
-5. Run: `python -m chromainvert run work/job.json`
-6. Validate the exported cube: `python scripts/validate_real_footage.py work/out.cube work/frames/source/source_001.png` (`scripts/validate_cube.py` is the generic FFmpeg `lut3d` acceptance check, not the run validator)
-7. Apply the grade: `ffmpeg -y -i work/frames/source/source_001.png -vf lut3d=file=work/out.cube work/graded.png`
+To build that installer from source:
 
-Or use the reusable driver: `python scripts/run_real_footage.py --source <video-or-dir> --reference <video-or-dir> --work-dir work`.
+```powershell
+cd app/gui
+npm ci
+npm run typecheck
+npm run build
+npm run dist
+```
 
-The venv reuses the system GPU PyTorch install via `--system-site-packages`, so no large CUDA download is needed.
+Installers land in `app/gui/release/`. For dev, run `npm run dev` plus `npm run electron:dev` in a second terminal.
 
-## Status
+Use the engine directly for the keyless check or for scripting. Needs Python 3.10 or newer, FFmpeg 7 or newer with ffprobe on PATH. A CUDA torch build helps; CPU runs slower.
 
-See `docs/CHROMAINVERT_HACKATHON_PLAN.md` for the full plan and `docs/PROGRESS.md` for the build log.
+```powershell
+python -m venv .venv --system-site-packages
+.venv\Scripts\Activate.ps1
+python -m pip install -e ./engine
+python -m pytest engine/tests -q
+python scripts/run_benchmark.py
+```
+
+One command demo (writes `work/demo/` with `out.cube`, `graded.mp4`, `before.png`, `after.png`, `report.json`):
+
+```powershell
+python scripts/run_demo.py --source "<clip.mov>" --reference "<reference.mov>" --workdir work/demo
+```
+
+For anything else, read the source doc: run of show in `docs/DEMO_SCRIPT.md`, frame job example in `assets/job.json.example`, GUI build in `app/gui/README.md`.
+
+## How it works
+
+Electron writes `work/job.json` and spawns `python -m chromainvert run`. The engine starts from identity (coarse 17, Catmull-Rom to 33) and runs Adam on Oklab quantile and moment terms with TV smoothing plus skin and shadow anchors. Export bakes the map into host code values and writes red-fastest `.cube`. Contract in `docs/ARCHITECTURE.md`.
+
+## Layout
+
+- `engine/chromainvert/`: color decoders, losses, optimizer, predictor, CLI
+- `engine/tests/`: one test module per engine module
+- `app/gui/`: Electron plus React product GUI
+- `scripts/`: demo and validation helpers
+- `docs/`: plan, architecture, demo script, Premiere checks, build log
+- `data/`: bring your own LUTs and weights (gitignored, no checkpoint shipped)
+- `work/`: gitignored runtime output
+
+## Validation
+
+```powershell
+python scripts/validate_cube.py
+python scripts/run_benchmark.py
+python scripts/premiere_validation.py
+```
+
+CI runs pytest on Ubuntu and GUI typecheck plus build on Windows, macOS, and Linux.
+
+## Limits
+
+- `rec709` is the tested path. `slog3` and Apple Log use a bounded working space with a host domain bake; saturated log colors carry interpolation error (mean abs error under 0.02 on random codes). See `docs/ARCHITECTURE.md` step 4.
+- Premiere Pro color manages Apple Log toward Rec.709 before Lumetri, so cubes for Premiere must be trained from Premiere exports or the host domain path. Steps in `docs/PREMIERE_VALIDATION.md`.
+
+## License
+
+Apache-2.0, see `LICENSE`.
+
+`work/`, `.venv/`, checkpoints (`*.pt`), and local footage stay out of git.

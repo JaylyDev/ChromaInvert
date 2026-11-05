@@ -906,55 +906,11 @@ export default function App(): JSX.Element {
 
       <div className="layout">
         <div className="column">
-          <section className="card" aria-label="Footage">
-            <h2>
-              <span className="step-num" aria-hidden="true">
-                1
-              </span>
-              Footage
-            </h2>
-            <p className="hint">TIFF preferred for precision. PNG, BMP, and JPG also load.</p>
-            <FrameList
-              title="Source frames"
-              files={sourceFrames}
-              disabled={running || referenceOnly}
-              hint={referenceOnly ? "Skipped in reference-only mode." : "Ungraded footage to match."}
-              manualValue={sourceManual}
-              onManualChange={setSourceManual}
-              onManualAdd={() => {
-                if (sourceManual.trim() !== "") {
-                  setSourceFrames((prev) => dedupeAppend(prev, [sourceManual]));
-                  setSourceManual("");
-                }
-              }}
-              onBrowse={onBrowseSources}
-              onClear={() => setSourceFrames([])}
-              onRemove={(index) => setSourceFrames((prev) => prev.filter((_, i) => i !== index))}
-            />
-            <FrameList
-              title="Reference frames"
-              files={referenceFrames}
-              disabled={running}
-              hint="Graded look to copy."
-              manualValue={referenceManual}
-              onManualChange={setReferenceManual}
-              onManualAdd={() => {
-                if (referenceManual.trim() !== "") {
-                  setReferenceFrames((prev) => dedupeAppend(prev, [referenceManual]));
-                  setReferenceManual("");
-                }
-              }}
-              onBrowse={onBrowseReferences}
-              onClear={() => setReferenceFrames([])}
-              onRemove={(index) => setReferenceFrames((prev) => prev.filter((_, i) => i !== index))}
-            />
-          </section>
-
           <section className="card" aria-label="Video import">
             <h2>Video import</h2>
             <p className="hint">
               Import the ungraded and graded videos, scrub to a frame, then capture it into the frame lists
-              above. Captures land in video_frames next to the output cube.
+              below. Captures land in video_frames next to the output cube.
             </p>
             {!desktop && (
               <div className="notice">
@@ -998,11 +954,49 @@ export default function App(): JSX.Element {
             </div>
           </section>
 
+          <section className="card" aria-label="Footage">
+            <h2>
+              Footage
+            </h2>
+            <p className="hint">TIFF preferred for precision. PNG, BMP, and JPG also load.</p>
+            <FrameList
+              title="Source frames"
+              files={sourceFrames}
+              disabled={running || referenceOnly}
+              hint={referenceOnly ? "Skipped in reference-only mode." : "Ungraded footage to match."}
+              manualValue={sourceManual}
+              onManualChange={setSourceManual}
+              onManualAdd={() => {
+                if (sourceManual.trim() !== "") {
+                  setSourceFrames((prev) => dedupeAppend(prev, [sourceManual]));
+                  setSourceManual("");
+                }
+              }}
+              onBrowse={onBrowseSources}
+              onClear={() => setSourceFrames([])}
+              onRemove={(index) => setSourceFrames((prev) => prev.filter((_, i) => i !== index))}
+            />
+            <FrameList
+              title="Reference frames"
+              files={referenceFrames}
+              disabled={running}
+              hint="Graded look to copy."
+              manualValue={referenceManual}
+              onManualChange={setReferenceManual}
+              onManualAdd={() => {
+                if (referenceManual.trim() !== "") {
+                  setReferenceFrames((prev) => dedupeAppend(prev, [referenceManual]));
+                  setReferenceManual("");
+                }
+              }}
+              onBrowse={onBrowseReferences}
+              onClear={() => setReferenceFrames([])}
+              onRemove={(index) => setReferenceFrames((prev) => prev.filter((_, i) => i !== index))}
+            />
+          </section>
+
           <section className="card" aria-label="Output">
             <h2>
-              <span className="step-num" aria-hidden="true">
-                2
-              </span>
               Output
             </h2>
             <p className="hint">job.json and report.json land next to this path.</p>
@@ -1026,9 +1020,6 @@ export default function App(): JSX.Element {
 
           <section className="card" aria-label="Grade settings">
             <h2>
-              <span className="step-num" aria-hidden="true">
-                3
-              </span>
               Grade settings
             </h2>
             <p className="hint">Source profile decodes source frames. Reference profile decodes the graded reference: keep Auto (rec709 for log sources such as Apple Log). Strength blends back toward identity.</p>
@@ -1330,9 +1321,6 @@ export default function App(): JSX.Element {
           )}
           <section className="card" aria-label="Run">
             <h2>
-              <span className="step-num" aria-hidden="true">
-                4
-              </span>
               Run
             </h2>
             <p className="hint">
