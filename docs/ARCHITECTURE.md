@@ -2,7 +2,7 @@
 
 ## Process model
 
-The C++ desktop host drives the Python engine as a subprocess. No shared memory, no embedded interpreter, no sockets.
+The Electron GUI drives the Python engine as a subprocess. No shared memory, no embedded interpreter, no sockets.
 
 ```
 app --writes--> work/job.json --reads--> chromainvert run work/job.json
