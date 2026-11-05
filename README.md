@@ -8,7 +8,7 @@ Built for the Meta Global AI Developer Hackathon (Oct 26 to Nov 4, 2026), Indie 
 
 - **Track and Problem Statement**: Indie Developer, Build for Your World (portable color grading for creators, mobile shooters, and small post houses).
 - **Provenance (Oct 26 to Nov 4, 2026)**: Built 100 percent from scratch during the hackathon window.
-- **Meta AI usage**: Muse Spark series powered development (Python engine, C++ hosts, GUI, scripts, including open weights endpoints via Baseten and Meta); Muse Wonder powered review and complex tasks (architecture decisions and council reviews, see `docs/PROGRESS.md`). The grading runtime itself is local and deterministic (PyTorch plus FFmpeg, no model API calls at inference).
+- **Meta AI usage**: Muse Spark series powered development (Python engine, GUI, scripts, including open weights endpoints via Baseten and Meta); Muse Wonder powered review and complex tasks (architecture decisions and council reviews, see `docs/PROGRESS.md`). The grading runtime itself is local and deterministic (PyTorch plus FFmpeg, no model API calls at inference).
 - **Bonus Prize Category Targeted**: Best Creative Build.
 - **3-Minute Demo Video**: https://www.youtube.com/watch?v=0d8jhrCcYSA
 - **Repo**: https://github.com/JaylyDev/ChromaInvert (single self-contained public repository).
@@ -35,7 +35,7 @@ Core claims proven in the demo:
 
 | Model | How it was used |
 |---|---|
-| Muse Spark series (proprietary API plus open weights endpoints via Baseten and Meta) | Coding across the stack: Python color engine, C++ hosts, Electron plus React GUI, validation and benchmark scripts |
+| Muse Spark series (proprietary API plus open weights endpoints via Baseten and Meta) | Coding across the stack: Python color engine, Electron plus React GUI, validation and benchmark scripts |
 | Muse Wonder | Review and complex tasks: architecture decisions, council reviews on PRs, debugging hard failures |
 
 Review evidence lives in `docs/PROGRESS.md`: Wonder council reviews for the GUI host (PR #24, verdict changes requested, all findings applied), the FFmpeg decode link (Issue #10, 17 findings applied), the `export_graded` script, deterministic GPU mode and the random RGB probe heldout gate, the synthetic benchmark, and CI workflow majors. The repo workflow requires a Wonder council review before every commit, documented in `AGENTS.md`.
@@ -68,7 +68,7 @@ python scripts/premiere_validation.py --cube work/out.cube --source work/src_fra
 
 ## Quickstart (reproducible)
 
-Prerequisites: Windows PowerShell from the repo root, Python 3.10 or newer, FFmpeg 7 or newer plus ffprobe on PATH, a CUDA PyTorch install for GPU speed (CPU works in degraded mode).
+Prerequisites for the engine path (the packaged GUI needs no installs): Windows PowerShell from the repo root, Python 3.10 or newer, FFmpeg 7 or newer plus ffprobe on PATH, a CUDA PyTorch install for GPU speed (CPU works in degraded mode).
 
 ```powershell
 python -m venv .venv --system-site-packages
@@ -110,19 +110,61 @@ Reference only prediction (no source frames; you must train weights on LUTs you 
 python -m chromainvert predict <graded.png> --profile rec709 --weights <path\to\your\checkpoint.pt> --out out.cube
 ```
 
-## App and CLI
+## Use the app (GUI)
 
-Product GUI (Electron plus React in `app/gui`): inputs, Match and Cancel, progress bar, status, log tail. C++ stays for FFmpeg and math helpers only. Qt rejected for licensing, ImGui rejected as too developer focused; see `docs/GUI_DECISION.md`. Win32 host kept as legacy fallback.
+Download the installer from GitHub Releases, run it, and launch ChromaInvert: pick a source clip and a reference frame, choose the output `.cube` path, then press Match. The packaged app needs no installs: the engine and FFmpeg ship inside it (the installer bundles `chromainvert-engine` plus static `ffmpeg`/`ffprobe`, resolved before any PATH fallback).
+
+### Build the GUI app as an exe
+
+To build the installer yourself you need Node 22:
 
 ```powershell
 cd app/gui
-npm install
+npm ci
 npm run typecheck
 npm run build
-npm run dev
+npm run dist
 ```
 
-C++ console driver (`chromainvert-host`, C++17 standard library only): extracts frames, writes `job.json`, spawns the engine, encodes previews. See `app/README.md` for build and run commands.
+Installers land under `app/gui/release/` (NSIS installer plus portable exe). `npm run dist` builds for the current platform; `dist:mac` and `dist:linux` target those platforms. For development only, `npm run dev` plus `npm run electron:dev` runs without packaging (a dev build without the bundled engine falls back to system Python and offers a one-click engine install on first run).
+
+### Engine CLI setup (contributors and CLI users)
+
+The Python engine and scripts need a local setup; the packaged GUI does not.
+
+1. Install Python 3.10 or newer on Windows and put it on PATH, then verify:
+
+```powershell
+python --version
+```
+
+2. Install PyTorch. The engine requires `torch>=2.0` (see `engine/pyproject.toml`). The easiest path is the selector at https://pytorch.org/ : pick Windows, Python, and your CUDA build (or CPU), then run the install command it suggests. Verify with GPU detection:
+
+```powershell
+python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+```
+
+A CUDA build is faster; CPU works in degraded mode.
+
+3. Install the engine library from PyPI (https://pypi.org/project/chromainvert/):
+
+```powershell
+python -m pip install chromainvert
+```
+
+Or with uv:
+
+```powershell
+uv pip install chromainvert
+```
+
+Install PyTorch in step 2 first so the resolver keeps your CUDA build. Developers working from a clone can install an editable copy instead: `python -m pip install -e ./engine` from the repo root.
+
+4. Install FFmpeg 7 or newer plus ffprobe on PATH. Only the engine CLI and scripts use system FFmpeg; the packaged GUI uses its bundled copy.
+
+## App and CLI
+
+Product GUI (Electron plus React in `app/gui`): inputs, Match and Cancel, progress bar, status, log tail. See `docs/GUI_DECISION.md` for the Electron decision.
 
 Engine CLI:
 
@@ -139,29 +181,34 @@ python scripts/export_graded.py --help
 
 ## Build and dependencies
 
-Most users only need the consumer set: Python plus FFmpeg grades footage with no compilation, no accounts, and no API keys. Node and the C++ toolchain are only for contributors building the GUI or desktop hosts from source.
+The packaged GUI needs no installs: the engine and FFmpeg ship inside it. The set below is only for engine CLI users and contributors: Python plus FFmpeg grades footage with no compilation, no accounts, and no API keys. Node is only needed for contributors building the GUI from source.
 
 To use ChromaInvert (consumers):
 
 | Dependency | Required | Notes |
 |---|---|---|
 | OS | Windows 10 or newer | Engine and scripts run wherever Python and FFmpeg run; Ubuntu and macOS are covered by CI |
-| Python | 3.10 or newer (CI runs 3.11) | `requires-python = ">=3.10"` in `engine/pyproject.toml` |
-| Python packages | `torch>=2.0`, `numpy>=1.26`, `imageio>=2.30`, plus `pytest>=8` for tests | Installed with `pip install -e ./engine` (dev extras via `./engine[dev]`) |
+| Python | 3.10 or newer (CI runs 3.11) | `requires-python = ">=3.10"` in `engine/pyproject.toml`; only needed for the engine CLI and development, the packaged GUI bundles the engine |
+| Python packages | `torch>=2.0`, `numpy>=1.26`, `imageio>=2.30`, plus `pytest>=8` for tests | Installed with `pip install chromainvert` or `uv pip install chromainvert` (dev extras via `chromainvert[dev]`); engine CLI and development only |
 | CUDA | Optional | The venv reuses the system GPU PyTorch install via `--system-site-packages`, so no large CUDA download is needed; without a GPU the engine runs in CPU degraded mode |
-| FFmpeg plus ffprobe | FFmpeg 7 or newer on PATH | Frame extraction, `lut3d` preview and graded export |
+| FFmpeg plus ffprobe | FFmpeg 7 or newer on PATH | Frame extraction, `lut3d` preview and graded export for the engine CLI and scripts; the packaged GUI bundles its own FFmpeg and ffprobe |
 
-Install the engine from the repo root:
+Install the engine from PyPI:
 
 ```powershell
-python -m pip install -e ./engine
+python -m pip install chromainvert
 ```
 
-To build the apps from source (contributors):
+Or with uv:
+
+```powershell
+uv pip install chromainvert
+```
+
+To build the app from source (contributors):
 
 | Dependency | Required | Notes |
 |---|---|---|
-| CMake and C++ toolchain | CMake 3.20 or newer, MSVC 2022 or MinGW-w64 GCC 13 plus, C++17 | Only needed for the Win32 host and `chromainvert-host`; standard library only, no extra packages |
 | Node.js and npm | Node 22, `npm ci` with the lockfile | Only needed for the Electron GUI in `app/gui` (CI pins Node 22) |
 
 ```powershell
@@ -171,16 +218,11 @@ npm run typecheck
 npm run build
 ```
 
-```powershell
-cmake -B build -S app
-cmake --build build --config Release
-```
-
-Binaries land under `build/` (`Release/ChromaInvert.exe` with the Visual Studio generator). Full per host instructions live in `app/README.md`.
+Packaged installers land under `app/gui/release/` via `npm run dist`
 
 ## How it works
 
-Subprocess plus files. No shared memory, no embedded interpreter, no sockets. The C++ host or Electron main writes `work/job.json`, spawns `python -m chromainvert run`, parses stdout JSONL progress, and applies the exported cube with FFmpeg `lut3d`.
+Subprocess plus files. No shared memory, no embedded interpreter, no sockets. Electron main writes `work/job.json`, spawns `python -m chromainvert run`, parses stdout JSONL progress, and applies the exported cube with FFmpeg `lut3d`.
 
 ```
 app --writes--> work/job.json --reads--> chromainvert run work/job.json
@@ -195,7 +237,6 @@ Optimization: identity init lattice (coarse 17, Catmull-Rom spline upsample to 3
 - `engine/chromainvert/`: Python color engine (`cube.py` read and write, `lut_module.py` differentiable LUT, `color.py` transfers and log decoders, `losses.py`, `masks.py`, `spline.py`, `optimize.py`, `lut_predictor.py`, `benchmark.py`, `cli.py`)
 - `engine/tests/`: one test module per engine module; full suite must stay green
 - `app/gui/`: Electron plus React product GUI (Vite renderer, TypeScript, no Qt)
-- `app/src/`: C++17 Win32 fallback plus `chromainvert-host` console driver, shared `ffmpeg` module, `Preview`
 - `scripts/`: 13 helpers (`run_demo`, `run_benchmark`, `run_real_footage`, `premiere_validation`, `export_graded`, `ffmpeg_helpers`, `make_reference_pairs`, `evaluate_single_image`, `make_training_data`, `train_lut_predictor`, `validate_cube`, `validate_real_footage`, `extract_frames`)
 - `docs/`: `CHROMAINVERT_HACKATHON_PLAN.md`, `ARCHITECTURE.md`, `DEMO_SCRIPT.md`, `PREMIERE_VALIDATION.md`, `GUI_DECISION.md`, `PROGRESS.md`
 - `data/`: bring your own training frames, LUTs, and weights (gitignored outputs; no checkpoint is shipped since a checkpoint distills its training LUTs)
