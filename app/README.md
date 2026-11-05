@@ -16,8 +16,10 @@ left. The Python mirror of the old helpers lives in
 
 Product path per issue #9. React renderer for inputs, Match and Cancel,
 progress bar, wipe preview, scopes, and export. Electron main writes
-`job.json`, resolves the bundled engine binary (or system Python fallback),
-and streams stdout JSONL progress over the preload bridge.
+`job.json`, resolves the `chromainvert` PyPI install (`chromainvert` on PATH,
+else `python -m chromainvert`, else press Install in the Environment setup
+(installs the engine via pip)), and streams
+stdout JSONL progress over the preload bridge.
 
 ```
 cd app/gui

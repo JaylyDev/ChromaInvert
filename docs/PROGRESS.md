@@ -1,5 +1,15 @@
 # ChromaInvert Progress Log
 
+## 2026-11-05: PyInstaller bundle removed, engine installs via pip
+
+Completed:
+- Deleted the PyInstaller machinery (`scripts/build_engine_bundle.py`, `app/gui/engine-bin/`, `app/gui/scripts/ensure-engine-bin.cjs`, the `extraResources` engine-bin entry, and the `dist*` ensure prefixes). `main.ts` resolves the engine as `chromainvert` on PATH then `python -m chromainvert`; the Environment setup installs it via pip. Static `ffmpeg`/`ffprobe` shipping is unchanged.
+- Reworded install copy to install via pip (`App.tsx`, `main.ts` missing-engine message, both READMEs, `AGENTS.md`).
+
+Verified:
+- `npm run typecheck` and `npm run build`: pass.
+- `python -m pytest engine/tests -q`: 130 passed, 1 skipped (ffmpeg not on PATH, unrelated).
+
 ## 2026-11-05: engine adopts src layout for PyPI publishing
 
 Completed:
@@ -23,39 +33,20 @@ Completed:
 ## 2026-11-05: GUI first-run environment setup with progress
 
 Completed:
-- New Environment card: on launch the GUI probes system Python (`import chromainvert`, torch version plus CUDA) and, when the engine is missing and no bundled binary is staged, offers one-click `pip install chromainvert` with a live progress bar parsed from pip output, cancellable, with the pip tail on failure. Bundled-engine users never see the card.
+- New Environment card: on launch the GUI probes system Python (`import chromainvert`, torch version plus CUDA) and, when the engine is missing, offers one-click `pip install chromainvert` with a live progress bar parsed from pip output, cancellable, with the pip tail on failure.
 - Wiring: `env:check`/`env:setup`/`env:cancel` IPC plus `setup:progress`/`setup:log` events, bridge and shared types, `missingToolMessage` pointing at the setup panel. Verified `typecheck` plus `build`; probe JSON contract checked headlessly (`engineOk false`, torch `2.8.0+cu129` CUDA true); `pip install chromainvert` correctly reports no distribution until the PyPI publish lands.
 
-## 2026-11-05: Engine bundle switches to directory mode
+## 2026-11-05: GUI resolves static ffmpeg/ffprobe with fallback
 
 Completed:
-- Single-file `chromainvert-engine.exe` built but failed at startup (`Failed to extract cudnn_adv64_9.dll`): torch's multi-hundred-megabyte cuDNN DLLs do not survive the onefile bootloader on Windows. The spec now uses `COLLECT` directory mode; the bundle stages to `app/gui/engine-bin/<platform>/chromainvert-engine/` and the GUI resolves the exe inside it. Smoke test: staged `chromainvert-engine.exe --help` lists `run`, `predict`, `benchmark`.
-- Also fixed the dev-mode bundled-engine lookup (two levels up from `dist-electron/electron`) and removed the obsolete `pathlib` backport blocking PyInstaller.
-
-## 2026-11-05: GUI resolves bundled engine plus static ffmpeg/ffprobe with fallback
-
-Completed:
-- `app/gui/electron/main.ts` resolves the engine with priority bundled `chromainvert-engine` next to `process.resourcesPath`, then `chromainvert-engine` on PATH, then `python -m chromainvert`; stdout JSONL progress parsing is unchanged; a missing engine returns a DoneResult pointing at the bundled release or a Python install.
-- `app/gui/package.json` ships `engine-bin/${os}` via `extraResources` (`${os}` verified against the installed electron-builder as `win`/`mac`/`linux`); empty `.gitkeep` only dirs keep packaging green with no binary staged.
 - Added `ffmpeg-static@5.3.0` and `ffprobe-static@3.1.0`: main requires them and rewrites `app.asar` to `app.asar.unpacked` when packaged; `asarUnpack` keeps both binaries executable outside the archive; per-platform `files` ignores ship only the current OS `ffprobe-static/bin` (the package carries all platforms, about 336 MB).
-- Centralized `resolveTool(ToolKind)` for ffmpeg, ffprobe, and the engine (bundled, then PATH, then engine-only Python fallback); `video:probe` and `video:grab` use the resolved paths; missing tools report reinstall-or-install guidance.
+- Centralized `resolveTool(ToolKind)` for ffmpeg, ffprobe, and the engine; `video:probe` and `video:grab` use the resolved paths; missing tools report reinstall-or-install guidance.
 - Added `app/gui/electron/ffprobe-static.d.ts` (`ffprobe-static` ships no types; `ffmpeg-static` ships its own).
 
 Verified:
 - `cd app/gui && npm run typecheck` and `npm run build`: pass.
 - Static binaries execute: ffmpeg 6.1.1, ffprobe 4.0.2.
 - `npm run dist:dir` on Windows: the unpacked layout holds `ffmpeg.exe` plus only `ffprobe-static/bin/win32` (darwin/linux pruned); both unpacked binaries print their versions.
-- `python -m pytest engine/tests -q`: 131 passed (engine code untouched).
-
-## 2026-11-05: engine bundle recipe and staging
-
-Completed:
-- Added `engine/chromainvert-engine.spec`: PyInstaller single-file recipe exposing the same CLI as `python -m chromainvert` (`run`, `predict`, `benchmark`). Build on each release platform (PyInstaller cannot cross-compile): `cd engine && pyinstaller chromainvert-engine.spec --noconfirm`.
-- Added `scripts/build_engine_bundle.py`: runs the spec and stages the binary into `app/gui/engine-bin/<win|mac|linux>/`. The documented dev-machine command from the repo root is `python scripts/build_engine_bundle.py`; GUI pickup and `extraResources` wiring land with the resolution change.
-- Added `app/gui/engine-bin/` per-platform dirs with `.gitkeep` placeholders (binaries gitignored) plus a README with the layout and build command.
-
-Verified:
-- Spec file parses; the `imageio.plugins` hidden-import collection (30 modules) and the `chromainvert.cli` entry import resolve in this env. The full `pyinstaller` build is left to a release machine (large torch bundle, one binary per platform).
 - `python -m pytest engine/tests -q`: 131 passed (engine code untouched).
 
 ## 2026-11-04: GUI uses the host-domain Apple Log path

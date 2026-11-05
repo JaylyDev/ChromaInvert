@@ -248,27 +248,6 @@ interface ToolResolution {
   source: string;
 }
 
-function engineExeName(): string {
-  return process.platform === "win32" ? "chromainvert-engine.exe" : "chromainvert-engine";
-}
-
-function engineBinPlatform(): string {
-  if (process.platform === "win32") {
-    return "win";
-  }
-  if (process.platform === "darwin") {
-    return "mac";
-  }
-  return "linux";
-}
-
-function bundledEnginePath(): string {
-  if (app.isPackaged) {
-    return join(process.resourcesPath, "engine-bin", "chromainvert-engine", engineExeName());
-  }
-  return join(__dirname, "..", "..", "engine-bin", engineBinPlatform(), "chromainvert-engine", engineExeName());
-}
-
 function unpackedPath(path: string): string {
   if (app.isPackaged) {
     return path.replace("app.asar", "app.asar.unpacked");
@@ -296,19 +275,13 @@ function onPath(command: string): boolean {
 
 function resolveTool(kind: ToolKind): Promise<ToolResolution | null> {
   if (kind === ToolKind.Engine) {
-    const bundled = bundledEnginePath();
-    return isFile(bundled).then((present): ToolResolution | null => {
-      if (present) {
-        return { command: bundled, prefixArgs: [], source: "bundled engine" };
-      }
-      if (onPath("chromainvert-engine")) {
-        return { command: "chromainvert-engine", prefixArgs: [], source: "PATH" };
-      }
-      if (onPath("python")) {
-        return { command: "python", prefixArgs: ["-m", "chromainvert"], source: "system Python" };
-      }
-      return null;
-    });
+    if (onPath("chromainvert")) {
+      return Promise.resolve({ command: "chromainvert", prefixArgs: [], source: "PATH" });
+    }
+    if (onPath("python")) {
+      return Promise.resolve({ command: "python", prefixArgs: ["-m", "chromainvert"], source: "system Python" });
+    }
+    return Promise.resolve(null);
   }
   const name = kind === ToolKind.Ffmpeg ? "ffmpeg" : "ffprobe";
   const staticPath = kind === ToolKind.Ffmpeg ? ffmpegStaticPath : ffprobeStaticPath;
@@ -331,10 +304,10 @@ function resolveTool(kind: ToolKind): Promise<ToolResolution | null> {
 
 function missingToolMessage(kind: ToolKind): string {
   if (kind === ToolKind.Engine) {
-    return "No engine found: press Install in the Environment setup to fetch it from PyPI, or reinstall the bundled ChromaInvert release.";
+    return "No engine found: install the engine via pip (pip install chromainvert), or press Install in the Environment setup.";
   }
   const name = kind === ToolKind.Ffmpeg ? "ffmpeg" : "ffprobe";
-  return name + " was not found: reinstall the bundled ChromaInvert app, which ships " + name + ", or install FFmpeg and put it on PATH.";
+  return name + " was not found: reinstall the ChromaInvert app, which ships " + name + ", or install FFmpeg and put it on PATH.";
 }
 
 interface EnvProbe {
@@ -387,37 +360,19 @@ function toEnvStatus(python: string, value: unknown): EnvStatus {
 }
 
 function checkEnv(): Promise<EnvStatus> {
-  const bundled = bundledEnginePath();
-  return isFile(bundled).then((present): Promise<EnvStatus> => {
-    const bundledStatus = (python: string): EnvStatus => ({
-      python,
-      engineOk: true,
-      engineVersion: "bundled",
-      torchOk: false,
-      torchVersion: "",
-      cuda: false
-    });
-    if (!onPath("python")) {
-      return Promise.resolve(present ? bundledStatus("") : emptyEnvStatus(""));
-    }
-    const probed = spawnSync("python", ["-c", ENV_PROBE], { encoding: "utf8" });
-    if (probed.status !== 0) {
-      return Promise.resolve(present ? bundledStatus("python") : emptyEnvStatus("python"));
-    }
-    return Promise.resolve(String(probed.stdout)).then(
-      (text: string): unknown => JSON.parse(text)
-    ).then(
-      (value: unknown): EnvStatus => {
-        const status = toEnvStatus("python", value);
-        if (present) {
-          status.engineOk = true;
-          status.engineVersion = "bundled";
-        }
-        return status;
-      },
-      (): EnvStatus => (present ? bundledStatus("python") : emptyEnvStatus("python"))
-    );
-  });
+  if (!onPath("python")) {
+    return Promise.resolve(emptyEnvStatus(""));
+  }
+  const probed = spawnSync("python", ["-c", ENV_PROBE], { encoding: "utf8" });
+  if (probed.status !== 0) {
+    return Promise.resolve(emptyEnvStatus("python"));
+  }
+  return Promise.resolve(String(probed.stdout)).then(
+    (text: string): unknown => JSON.parse(text)
+  ).then(
+    (value: unknown): EnvStatus => toEnvStatus("python", value),
+    (): EnvStatus => emptyEnvStatus("python")
+  );
 }
 
 let setupChild: ChildProcess | null = null;

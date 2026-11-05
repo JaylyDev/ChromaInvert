@@ -722,7 +722,7 @@ export default function App(): JSX.Element {
     }
     setSetupRunning(true);
     setSetupPercent(0);
-    setSetupMessage("Installing the engine from PyPI. This downloads torch plus numpy and imageio and can take several minutes.");
+    setSetupMessage("Installing the engine via pip. This downloads torch plus numpy and imageio and can take several minutes.");
     setSetupLog("");
     bridge.setupEnv().then(
       (result) => {
@@ -1287,7 +1287,7 @@ export default function App(): JSX.Element {
             <section className="card" aria-label="Environment">
               <h2>Environment</h2>
               <p className="hint">
-                The engine is not installed yet. Install it once from PyPI, then Match works offline.
+                The engine is not installed yet. Install it once via pip, then Match works offline.
               </p>
               <ul className="file-list">
                 <li className="file-item">
@@ -1310,7 +1310,7 @@ export default function App(): JSX.Element {
               <div className="row" style={{ marginTop: 12 }}>
                 {!setupRunning ? (
                   <button type="button" className="primary" onClick={onSetup} disabled={envChecking}>
-                    Install engine from PyPI
+                    Install engine
                   </button>
                 ) : (
                   <button type="button" onClick={onCancelSetup}>

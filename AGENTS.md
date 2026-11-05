@@ -20,9 +20,8 @@ Python engine plus Electron GUI monorepo. Python source lives under `engine/src/
 - `engine/src/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000) plus the seeded random-RGB probe heldout gate and `style_probe_metrics` for LUT-to-LUT comparison on a random probe.
 - `engine/LICENSE`: Apache-2.0 copy of the repo root license so the `engine/` sdist and wheel carry license files per PEP 639 (`license-files`).
 - `app/README.md`: Windows run steps for the Electron GUI.
-- `app/gui/package.json`, `app/gui/vite.config.ts`, `app/gui/index.html`: Electron + React product GUI shell (Vite renderer, TypeScript, no Qt); ships `engine-bin/${os}` via `extraResources`, unpacks `ffmpeg-static`/`ffprobe-static` via `asarUnpack` with a per-platform ffprobe prune.
-- `app/gui/engine-bin/`: per-platform bundled `chromainvert-engine` binaries (gitignored) plus README; every `dist*` script runs `scripts/ensure-engine-bin.js` so packaging succeeds with no binary staged.
-- `app/gui/electron/main.ts`, `app/gui/electron/preload.ts`: Electron main (writes `job.json`, resolves engine/ffmpeg/ffprobe with bundled, PATH, then Python fallback, first-run `env:check`/`env:setup` PyPI install with progress, parses stdout JSONL progress) and preload bridge.
+- `app/gui/package.json`, `app/gui/vite.config.ts`, `app/gui/index.html`: Electron + React product GUI shell (Vite renderer, TypeScript, no Qt); unpacks `ffmpeg-static`/`ffprobe-static` via `asarUnpack` with a per-platform ffprobe prune.
+- `app/gui/electron/main.ts`, `app/gui/electron/preload.ts`: Electron main (writes `job.json`, resolves the engine via the pip-installed `chromainvert` on PATH then system Python, resolves ffmpeg/ffprobe via static npm binaries or PATH, first-run `env:check`/`env:setup` install via pip with progress, parses stdout JSONL progress) and preload bridge.
 - `app/gui/electron/ffprobe-static.d.ts`: types the untyped `ffprobe-static` export (`ffmpeg-static` ships its own).
 - `app/gui/src/App.tsx`, `app/gui/src/api.ts`, `app/gui/src/types.ts`: React one-screen GUI (inputs, reference-only predict mode, Match and Cancel, progress bar, status, log tail) on the preload bridge.
 - `scripts/ffmpeg_helpers.py`: FFmpeg Level 1 subprocess helpers (ffprobe parse, 16-bit PNG frame extraction with 8-bit fallback, lut3d preview, before/after, EngineRunner, error surfaces).
@@ -38,7 +37,6 @@ Python engine plus Electron GUI monorepo. Python source lives under `engine/src/
 - `scripts/evaluate_single_image.py`: paired recovery and predictor check on one manifest pair with style-probe and heldout DeltaE2000 plus baselines; `--weights` adds the predicted LUT comparison.
 - `scripts/make_training_data.py`: builds predictor training data in working space (real frames graded with real 33x LUTs plus mild parametric grades and identity).
 - `scripts/train_lut_predictor.py`: trains the predictor MLP with held-out LUT validation, writes weights plus metrics JSON.
-- `scripts/build_engine_bundle.py`: builds the PyInstaller engine bundle and stages the `chromainvert-engine` directory into `app/gui/engine-bin/<platform>/`.
 - `engine/tests/test_predict.py`: predict CLI and reference-only run acceptance, rejection, and weights requirement.
 - `engine/tests/test_lut_predictor.py`: feature determinism, near-identity init, single-sample overfit, 17 to 33 upsample export.
 - `scripts/extract_frames.py`: extracts N frames from a video via FFmpeg.
