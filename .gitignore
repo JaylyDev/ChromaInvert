@@ -11,6 +11,8 @@ node_modules/
 
 release/
 *.pt
+app/gui/engine-bin/*/*
+!app/gui/engine-bin/*/.gitkeep
 /data/videos/apple_log/*
 /data/videos/rec709/*
 /data/videos/s-log3/*

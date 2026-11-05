@@ -16,6 +16,7 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `engine/chromainvert/spline.py`: separable Catmull-Rom upsampling for coarse-to-fine lattices.
 - `engine/chromainvert/optimize.py`: Adam optimization loop with seeded pixel sampling, the `OptimizeConfig` weights, and the `deterministic` GPU mode flag.
 - `engine/chromainvert/cli.py`: `chromainvert run job.json`, `chromainvert predict image`, and `chromainvert benchmark` entry points; `run` accepts `reference_only` jobs with `predict_weights`.
+- `engine/chromainvert-engine.spec`: PyInstaller single-file bundle recipe exposing the same CLI (`run`, `predict`, `benchmark`); build on each release platform, staged via `scripts/build_engine_bundle.py`.
 - `engine/chromainvert/lut_predictor.py`: single-image LUT predictor; 38 grade statistics plus a residual MLP around identity, 17 lattice spline-upsampled to 33. No checkpoint is shipped; checkpoints are never committed since they distill their training LUTs; see `data/README.md` and pass the file via `predict_weights` or `--weights`.
 - `engine/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000) plus the seeded random-RGB probe heldout gate and `style_probe_metrics` for LUT-to-LUT comparison on a random probe.
 - `app/CMakeLists.txt`: builds both the Win32 `ChromaInvert` desktop host and the `chromainvert-host` console driver (C++17, standard library only); the desktop target also compiles the shared `ffmpeg` module and `Preview` for the upcoming preview pane.
@@ -26,6 +27,7 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `app/src/Preview.h`, `app/src/Preview.cpp`: graded preview encode plus before/after stills via the `Ffmpeg` class.
 - `app/README.md`: Windows build and run steps for the Electron GUI, both C++ hosts, shared module notes, Level 2 plan.
 - `app/gui/package.json`, `app/gui/vite.config.ts`, `app/gui/index.html`: Electron + React product GUI shell (Vite renderer, TypeScript, no Qt).
+- `app/gui/engine-bin/`: per-platform bundled `chromainvert-engine` binaries (gitignored) plus README; `.gitkeep` placeholders keep packaging green with no binary staged.
 - `app/gui/electron/main.ts`, `app/gui/electron/preload.ts`: Electron main (writes `job.json`, spawns `python -m chromainvert run`, parses stdout JSONL progress) and preload bridge.
 - `app/gui/src/App.tsx`, `app/gui/src/api.ts`, `app/gui/src/types.ts`: React one-screen GUI (inputs, reference-only predict mode, Match and Cancel, progress bar, status, log tail) on the preload bridge.
 - `scripts/ffmpeg_helpers.py`: FFmpeg Level 1 subprocess helpers (ffprobe parse, 16-bit PNG frame extraction with 8-bit fallback, lut3d preview, before/after, EngineRunner, error surfaces).
@@ -41,6 +43,7 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `scripts/evaluate_single_image.py`: paired recovery and predictor check on one manifest pair with style-probe and heldout DeltaE2000 plus baselines; `--weights` adds the predicted LUT comparison.
 - `scripts/make_training_data.py`: builds predictor training data in working space (real frames graded with real 33x LUTs plus mild parametric grades and identity).
 - `scripts/train_lut_predictor.py`: trains the predictor MLP with held-out LUT validation, writes weights plus metrics JSON.
+- `scripts/build_engine_bundle.py`: builds the PyInstaller engine bundle and stages the binary into `app/gui/engine-bin/<platform>/`.
 - `engine/tests/test_predict.py`: predict CLI and reference-only run acceptance, rejection, and weights requirement.
 - `engine/tests/test_lut_predictor.py`: feature determinism, near-identity init, single-sample overfit, 17 to 33 upsample export.
 - `scripts/extract_frames.py`: extracts N frames from a video via FFmpeg.

@@ -1,5 +1,16 @@
 # ChromaInvert Progress Log
 
+## 2026-11-05: engine bundle recipe and staging
+
+Completed:
+- Added `engine/chromainvert-engine.spec`: PyInstaller single-file recipe exposing the same CLI as `python -m chromainvert` (`run`, `predict`, `benchmark`). Build on each release platform (PyInstaller cannot cross-compile): `cd engine && pyinstaller chromainvert-engine.spec --noconfirm`.
+- Added `scripts/build_engine_bundle.py`: runs the spec and stages the binary into `app/gui/engine-bin/<win|mac|linux>/`. The documented dev-machine command from the repo root is `python scripts/build_engine_bundle.py`; GUI pickup and `extraResources` wiring land with the resolution change.
+- Added `app/gui/engine-bin/` per-platform dirs with `.gitkeep` placeholders (binaries gitignored) plus a README with the layout and build command.
+
+Verified:
+- Spec file parses; the `imageio.plugins` hidden-import collection (30 modules) and the `chromainvert.cli` entry import resolve in this env. The full `pyinstaller` build is left to a release machine (large torch bundle, one binary per platform).
+- `python -m pytest engine/tests -q`: 131 passed (engine code untouched).
+
 ## 2026-11-04: GUI uses the host-domain Apple Log path
 
 Completed:
