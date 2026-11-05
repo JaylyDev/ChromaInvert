@@ -1,3 +1,5 @@
+// Legacy fallback host: the product path is the Electron GUI in app/gui with
+// chromainvert-host as its FFmpeg sidecar. This Win32 host still builds but gets no new UI.
 #include <windows.h>
 
 #include "MainWindow.h"

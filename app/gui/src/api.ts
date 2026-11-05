@@ -9,6 +9,7 @@ export interface GuiBridge {
   pickReferenceVideo: () => Promise<string | null>;
   probeVideo: (videoPath: string) => Promise<VideoProbe>;
   grabFrame: (videoPath: string, timestamp: number, kind: string, outputDir: string) => Promise<FrameGrab>;
+  applyPreview: (input: string, cube: string, output: string) => Promise<DoneResult>;
   pickOutputCube: (suggestedPath: string) => Promise<string | null>;
   pickWeights: () => Promise<string | null>;
   onProgress: (cb: (update: ProgressUpdate) => void) => void;

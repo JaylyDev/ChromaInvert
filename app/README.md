@@ -9,7 +9,7 @@ JSONL progress protocol. See `docs/GUI_DECISION.md` for the Electron decision
 
 ## Product GUI (Electron + React, in `gui/`)
 
-Product path per issue #9. React renderer for inputs, Match and Cancel, progress bar, wipe preview, scopes, and export. Electron main writes `job.json`, spawns `python -m chromainvert run` or `chromainvert-host`, and streams stdout JSONL progress over the preload bridge. C++ stays for FFmpeg and math helpers only.
+Product path per issue #9. React renderer for inputs, Match and Cancel, progress bar, wipe preview, scopes, and export. Electron main writes `job.json`, spawns `python -m chromainvert run` or `chromainvert-host`, and streams stdout JSONL progress over the preload bridge. For video work the GUI prefers the `chromainvert-host` FFmpeg sidecar: `video:grab` runs `chromainvert-host grab` and `preview:apply` runs `chromainvert-host preview`, resolving the binary alongside the app resources first and then on PATH, and falling back to direct `ffmpeg` spawning when the sidecar is absent. The GUI passes its own resolved tool paths to the sidecar through `--ffmpeg` (and `--ffprobe` where supported) instead of assuming PATH. End users get `ffmpeg` and `ffprobe` inside the app install (resolved bundled-first, then on PATH); devs running the GUI from source still need them on PATH. C++ stays for FFmpeg and math helpers only.
 
 ```
 cd app/gui
@@ -56,7 +56,7 @@ below and in the console host; scopes land with issue #11.
 
 ## Console host (`chromainvert-host`)
 
-C++17 console driver for the ChromaInvert engine. It extracts frames with
+C++17 console driver for the ChromaInvert engine and the FFmpeg sidecar used by the Electron GUI and CLI users. It extracts frames with
 FFmpeg, writes `job.json` (contract v1), spawns the Python engine, streams
 JSONL progress, prints the `report.json` summary, and applies the exported
 `.cube` with FFmpeg `lut3d`. The entry point is `app/src/host_main.cpp`;
@@ -97,6 +97,12 @@ Apply an existing `.cube` without running the engine:
 
 ```powershell
 .\build\chromainvert-host.exe preview --input clip.mov --cube work\out.cube --output work\graded.mp4
+```
+
+Grab one frame without running the engine (used by the Electron GUI `video:grab` path):
+
+```powershell
+.\build\chromainvert-host.exe grab --input clip.mov --timestamp 1.5 --output work\frame.png
 ```
 
 Notes:

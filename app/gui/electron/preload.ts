@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld("chromainvert", {
   probeVideo: (videoPath: string): Promise<VideoProbe> => ipcRenderer.invoke("video:probe", videoPath),
   grabFrame: (videoPath: string, timestamp: number, kind: string, outputDir: string): Promise<FrameGrab> =>
     ipcRenderer.invoke("video:grab", videoPath, timestamp, kind, outputDir),
+  applyPreview: (input: string, cube: string, output: string): Promise<DoneResult> =>
+    ipcRenderer.invoke("preview:apply", input, cube, output),
   pickOutputCube: (suggestedPath: string): Promise<string | null> =>
     ipcRenderer.invoke("job:pickOutput", suggestedPath),
   pickWeights: (): Promise<string | null> => ipcRenderer.invoke("job:pickWeights"),

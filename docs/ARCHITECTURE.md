@@ -12,6 +12,10 @@ app --reads--> work/out.cube --applies--> FFmpeg lut3d preview and encode
 
 `work/` is a gitignored runtime scratch directory. All job paths may be absolute or relative to the job file directory.
 
+## Host roles
+
+The Electron GUI in `app/gui/` is the product path. `chromainvert-host` is its FFmpeg sidecar: the GUI `video:grab` handler prefers `chromainvert-host grab` and the `preview:apply` handler prefers `chromainvert-host preview`, resolving the binary alongside the app resources first and then on PATH, and falling back to direct `ffmpeg` spawning when the sidecar is absent. The GUI passes its own resolved tool paths through the sidecar `--ffmpeg` and `--ffprobe` flags instead of assuming PATH. End users get `ffmpeg` and `ffprobe` inside the app install (resolved bundled-first, then on PATH); devs running from source need them on PATH or pass the flags explicitly. The sidecar is also the CLI entry point for engine runs (`run` plus single-shot `grab` and `preview`). The Win32 desktop host (`app/src/main.cpp`) is a legacy fallback: it still builds but gets no new UI.
+
 ## job.json (contract_version 2)
 
 Contract v2 is backwards compatible with v1; v1 jobs with `input_profile` `rec709`, `rec2020`, or `apple_log` still run when `contract_version` is 1 or 2. V2 adds bounded S-Log3 working-space support. `reference_only` jobs run under either version; the report records `mode` as `single_image` or `paired`.

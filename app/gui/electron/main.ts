@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Menu, dialog, ipcMain } from "electron";
 import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import type { FileFilter, IpcMainInvokeEvent } from "electron";
@@ -114,7 +115,11 @@ function probeVideoPath(videoPath: string): Promise<VideoProbe> {
   if (target === "") {
     return Promise.resolve(emptyProbe(videoPath, "Pick a video file first."));
   }
-  const probed = spawnSync("ffprobe", [
+  const tools = resolveTools();
+  if (tools === null) {
+    return Promise.resolve(emptyProbe(target, MISSING_TOOLS));
+  }
+  const probed = spawnSync(tools.ffprobe, [
     "-v", "error",
     "-select_streams", "v:0",
     "-show_entries", "stream=codec_name,width,height,avg_frame_rate",
@@ -134,6 +139,127 @@ function probeVideoPath(videoPath: string): Promise<VideoProbe> {
   );
 }
 
+const HOST_EXE = process.platform === "win32" ? "chromainvert-host.exe" : "chromainvert-host";
+const FFMPEG_EXE = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
+const FFPROBE_EXE = process.platform === "win32" ? "ffprobe.exe" : "ffprobe";
+
+interface ToolPaths {
+  ffmpeg: string;
+  ffprobe: string;
+}
+
+const MISSING_TOOLS = "FFmpeg tools are missing from this install. Reinstall the app to restore them.";
+
+let cachedTools: ToolPaths | null | undefined;
+
+// Resolve order: bundled alongside the app resources, then on PATH. Devs
+// running from source rely on PATH; end users get the bundled binaries.
+function resolveTool(base: string): string | null {
+  const resources = process.resourcesPath;
+  const bundled = typeof resources === "string" && resources !== "" ? join(resources, base) : "";
+  const candidates = bundled === "" ? [base] : [bundled, base];
+  for (const candidate of candidates) {
+    if (candidate !== base && !existsSync(candidate)) {
+      continue;
+    }
+    const probed = spawnSync(candidate, ["-version"], { encoding: "utf8" });
+    if (probed.error === undefined && probed.status === 0) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function resolveTools(): ToolPaths | null {
+  if (cachedTools !== undefined) {
+    return cachedTools;
+  }
+  const ffmpeg = resolveTool(FFMPEG_EXE);
+  const ffprobe = resolveTool(FFPROBE_EXE);
+  cachedTools = ffmpeg === null || ffprobe === null ? null : { ffmpeg, ffprobe };
+  return cachedTools;
+}
+
+let cachedHost: string | null | undefined;
+
+function hostCandidates(): string[] {
+  const names: string[] = [];
+  const resources = process.resourcesPath;
+  if (typeof resources === "string" && resources !== "") {
+    names.push(join(resources, HOST_EXE));
+  }
+  names.push(HOST_EXE);
+  return names;
+}
+
+// Resolve order: alongside the app resources, then on PATH. The probe spawn
+// runs the host with no command; it prints usage and exits 1 when present.
+function resolveHostBinary(): string | null {
+  if (cachedHost !== undefined) {
+    return cachedHost;
+  }
+  for (const candidate of hostCandidates()) {
+    if (candidate !== HOST_EXE && !existsSync(candidate)) {
+      continue;
+    }
+    const probed = spawnSync(candidate, [], { encoding: "utf8" });
+    if (probed.error === undefined) {
+      cachedHost = candidate;
+      return cachedHost;
+    }
+  }
+  cachedHost = null;
+  return cachedHost;
+}
+
+function grabFrameDirect(ffmpeg: string, target: string, time: number, absOut: string): Promise<FrameGrab> {
+  return new Promise<FrameGrab>((resolve) => {
+    const child: ChildProcess = spawn(ffmpeg, [
+      "-y", "-ss", String(time), "-i", target,
+      "-frames:v", "1", "-pix_fmt", "rgb24", absOut
+    ], { cwd: process.cwd() });
+    let detail = "";
+    child.stderr?.on("data", (chunk: Buffer) => {
+      detail = (detail + chunk.toString("utf8")).slice(-500);
+    });
+    child.on("error", () => {
+      resolve({ framePath: "", timestamp: time, error: "Could not run the resolved ffmpeg binary." });
+    });
+    child.on("close", (code: number | null) => {
+      if (code !== 0) {
+        resolve({ framePath: "", timestamp: time, error: detail === "" ? "ffmpeg frame grab failed." : detail });
+        return;
+      }
+      stat(absOut).then(
+        () => resolve({ framePath: absOut, timestamp: time, error: "" }),
+        () => resolve({ framePath: "", timestamp: time, error: "ffmpeg produced no output file." })
+      );
+    });
+  });
+}
+
+function grabFrameViaHost(host: string, ffmpeg: string, target: string, time: number, absOut: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const child: ChildProcess = spawn(host, [
+      "grab", "--input", target, "--timestamp", String(time), "--output", absOut,
+      "--ffmpeg", ffmpeg
+    ], { cwd: process.cwd() });
+    child.on("error", () => {
+      resolve(false);
+    });
+    child.on("close", (code: number | null) => {
+      if (code !== 0) {
+        resolve(false);
+        return;
+      }
+      stat(absOut).then(
+        () => resolve(true),
+        () => resolve(false)
+      );
+    });
+  });
+}
+
 function grabFrameAt(videoPath: string, timestamp: number, kind: string, outputDir: string): Promise<FrameGrab> {
   const target = videoPath.trim();
   const safeKind = kind === "source" || kind === "reference" ? kind : "frame";
@@ -147,30 +273,82 @@ function grabFrameAt(videoPath: string, timestamp: number, kind: string, outputD
   const fileName = safeKind + "_" + stampText + "s_" + String(Date.now() % 100000) + ".png";
   const absOut = join(workdirAbs, "video_frames", fileName);
   return mkdir(dirname(absOut), { recursive: true }).then(
-    (): Promise<FrameGrab> =>
-      new Promise<FrameGrab>((resolve) => {
-        const child: ChildProcess = spawn("ffmpeg", [
-          "-y", "-ss", String(time), "-i", target,
-          "-frames:v", "1", "-pix_fmt", "rgb24", absOut
+    (): Promise<FrameGrab> => {
+      const tools = resolveTools();
+      if (tools === null) {
+        return Promise.resolve({ framePath: "", timestamp: time, error: MISSING_TOOLS });
+      }
+      const host = resolveHostBinary();
+      if (host === null) {
+        return grabFrameDirect(tools.ffmpeg, target, time, absOut);
+      }
+      return grabFrameViaHost(host, tools.ffmpeg, target, time, absOut).then(
+        (ok: boolean): Promise<FrameGrab> =>
+          ok
+            ? Promise.resolve({ framePath: absOut, timestamp: time, error: "" })
+            : grabFrameDirect(tools.ffmpeg, target, time, absOut)
+      );
+    }
+  );
+}
+
+function applyPreviewDirect(ffmpeg: string, input: string, cube: string, outAbs: string): Promise<DoneResult> {
+  return new Promise<DoneResult>((resolve) => {
+    const child: ChildProcess = spawn(ffmpeg, [
+      "-y", "-loglevel", "error", "-i", input, "-vf", "lut3d=file=" + cube, outAbs
+    ], { cwd: process.cwd() });
+    let detail = "";
+    child.stderr?.on("data", (chunk: Buffer) => {
+      detail = (detail + chunk.toString("utf8")).slice(-500);
+    });
+    child.on("error", () => {
+      resolve({ exitCode: 1, summary: "Failed: could not run the resolved ffmpeg binary." });
+    });
+    child.on("close", (code: number | null) => {
+      const exitCode = code ?? 1;
+      resolve({
+        exitCode,
+        summary: exitCode === 0 ? "Done: " + outAbs : "Failed: " + (detail === "" ? "ffmpeg lut3d preview failed." : detail.slice(-500))
+      });
+    });
+  });
+}
+
+// Preview encodes prefer the chromainvert-host sidecar and fall back to ffmpeg.
+function applyPreviewLut(input: string, cube: string, output: string): Promise<DoneResult> {
+  const target = input.trim();
+  const cubePath = cube.trim();
+  if (target === "" || cubePath === "" || output.trim() === "") {
+    return Promise.resolve({ exitCode: 1, summary: "Preview needs an input, a cube, and an output path." });
+  }
+  const outAbs = resolvePath(process.cwd(), output);
+  return mkdir(dirname(outAbs), { recursive: true }).then(
+    (): Promise<DoneResult> => {
+      const tools = resolveTools();
+      if (tools === null) {
+        return Promise.resolve({ exitCode: 1, summary: MISSING_TOOLS });
+      }
+      const host = resolveHostBinary();
+      if (host === null) {
+        return applyPreviewDirect(tools.ffmpeg, target, cubePath, outAbs);
+      }
+      return new Promise<DoneResult>((resolve) => {
+        const child: ChildProcess = spawn(host, [
+          "preview", "--input", target, "--cube", cubePath, "--output", outAbs,
+          "--ffmpeg", tools.ffmpeg
         ], { cwd: process.cwd() });
-        let detail = "";
-        child.stderr?.on("data", (chunk: Buffer) => {
-          detail = (detail + chunk.toString("utf8")).slice(-500);
-        });
         child.on("error", () => {
-          resolve({ framePath: "", timestamp: time, error: "ffmpeg was not found on PATH." });
+          applyPreviewDirect(tools.ffmpeg, target, cubePath, outAbs).then(resolve);
         });
         child.on("close", (code: number | null) => {
-          if (code !== 0) {
-            resolve({ framePath: "", timestamp: time, error: detail === "" ? "ffmpeg frame grab failed." : detail });
+          if (code === 0) {
+            resolve({ exitCode: 0, summary: "Done: " + outAbs });
             return;
           }
-          stat(absOut).then(
-            () => resolve({ framePath: absOut, timestamp: time, error: "" }),
-            () => resolve({ framePath: "", timestamp: time, error: "ffmpeg produced no output file." })
-          );
+          applyPreviewDirect(tools.ffmpeg, target, cubePath, outAbs).then(resolve);
         });
-      })
+      });
+    }
   );
 }
 
@@ -345,6 +523,12 @@ ipcMain.handle(
     kind: string,
     outputDir: string
   ): Promise<FrameGrab> => grabFrameAt(videoPath, timestamp, kind, outputDir)
+);
+
+ipcMain.handle(
+  "preview:apply",
+  (event: IpcMainInvokeEvent, input: string, cube: string, output: string): Promise<DoneResult> =>
+    applyPreviewLut(input, cube, output)
 );
 
 ipcMain.handle(

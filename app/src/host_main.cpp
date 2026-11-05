@@ -27,6 +27,7 @@ void usage() {
       "usage:\n"
       "  chromainvert-host run --source-video SRC.mov --reference REF.png [options]\n"
       "  chromainvert-host run --source-frames A.png,B.png --reference-frames R.png [options]\n"
+      "  chromainvert-host grab --input SRC.mov --timestamp 1.5 --output frame.png [--ffmpeg ffmpeg]\n"
       "  chromainvert-host preview --input SRC --cube OUT.cube --output GRADED [--ffmpeg ffmpeg]\n"
       "\nrun options:\n"
       "  --workdir PATH  --job-file NAME  --output-cube NAME  --report-json NAME\n"
@@ -111,7 +112,8 @@ bool is_job_basename(const std::string& name) {
 }
 
 bool parse_flag(int argc, char** argv, int& i, const std::string& arg, CliOptions& opts,
-                std::string& preview_in, std::string& preview_cube, std::string& error) {
+                std::string& preview_in, std::string& preview_cube, double& grab_timestamp,
+                std::string& error) {
   double number = 0.0;
   if (arg == "--source-video") {
     return take_value(argc, argv, i, opts.source_video);
@@ -171,6 +173,19 @@ bool parse_flag(int argc, char** argv, int& i, const std::string& arg, CliOption
   if (arg == "--output") {
     return take_value(argc, argv, i, opts.preview_out);
   }
+  if (arg == "--timestamp") {
+    std::string text;
+    if (!take_value(argc, argv, i, text)) {
+      return false;
+    }
+    double value = 0.0;
+    if (!parse_number(text, value) || value < 0.0) {
+      error = "--timestamp must be a non-negative number of seconds";
+      return false;
+    }
+    grab_timestamp = value;
+    return true;
+  }
   std::string text;
   if (arg == "--coarse-size" || arg == "--lut-size" || arg == "--iterations" || arg == "--fine-iterations" ||
       arg == "--seed" || arg == "--strength" || arg == "--device" || arg == "--fractions") {
@@ -212,6 +227,25 @@ bool parse_flag(int argc, char** argv, int& i, const std::string& arg, CliOption
     opts.run.strength = number;
   }
   return true;
+}
+
+int cmd_grab(const std::string& ffmpeg, const std::string& input, double timestamp,
+             const std::string& output) {
+  if (input.empty() || output.empty() || timestamp < 0.0) {
+    std::fprintf(stderr, "error: grab needs --input, --timestamp, and --output\n");
+    return 1;
+  }
+  if (host::contains_shell_metachars(ffmpeg) || host::contains_shell_metachars(input) ||
+      host::contains_shell_metachars(output)) {
+    std::fprintf(stderr, "error: refusing shell arguments with expansion characters\n");
+    return 1;
+  }
+  if (host::extract_frame(ffmpeg, input, timestamp, output) != 0) {
+    std::fprintf(stderr, "error: ffmpeg frame grab failed\n");
+    return 1;
+  }
+  std::printf("grab: %s\n", output.c_str());
+  return 0;
 }
 
 int cmd_preview(const std::string& ffmpeg, const std::string& input, const std::string& cube,
@@ -381,20 +415,25 @@ int main(int argc, char** argv) {
   std::string command = argv[1];
   CliOptions opts;
   bool preview_mode = command == "preview";
+  bool grab_mode = command == "grab";
   std::string preview_in;
   std::string preview_cube;
-  if (command != "run" && command != "preview") {
+  double grab_timestamp = -1.0;
+  if (command != "run" && command != "preview" && command != "grab") {
     usage();
     return 1;
   }
   for (int i = 2; i < argc; ++i) {
     std::string error;
     std::string flag = argv[i];
-    if (!parse_flag(argc, argv, i, argv[i], opts, preview_in, preview_cube, error)) {
+    if (!parse_flag(argc, argv, i, argv[i], opts, preview_in, preview_cube, grab_timestamp, error)) {
       std::fprintf(stderr, "error: bad flag %s %s\n", flag.c_str(), error.c_str());
       usage();
       return 1;
     }
+  }
+  if (grab_mode) {
+    return cmd_grab(opts.ffmpeg, preview_in, grab_timestamp, opts.preview_out);
   }
   if (preview_mode) {
     return cmd_preview(opts.ffmpeg, preview_in, preview_cube, opts.preview_out);

@@ -1,5 +1,20 @@
 # ChromaInvert Progress Log
 
+## 2026-11-05: GUI resolves bundled ffmpeg for the sidecar
+
+Completed:
+- `app/gui/electron/main.ts` now resolves `ffmpeg`/`ffprobe` bundled-first (alongside the app resources, then on PATH) and passes the explicit paths to every spawn: `chromainvert-host grab` and `preview` get `--ffmpeg`, and the direct `ffmpeg`/`ffprobe` fallback uses the resolved paths instead of bare command names. With no bundled binary and nothing on PATH, `video:probe`, `video:grab`, and `preview:apply` return a clear reinstall message.
+- Docs (`app/README.md`, `docs/ARCHITECTURE.md`) state that end users get `ffmpeg`/`ffprobe` inside the app install while devs running from source still need them on PATH or pass the sidecar flags.
+- Verified: CMake build passes, `npm run typecheck` passes. Packaging the binaries into the installer (`extraResources` or equivalent) is left to the sibling ffmpeg-static change.
+
+## 2026-11-05: GUI prefers the chromainvert-host FFmpeg sidecar
+
+Completed:
+- Added the single-shot `chromainvert-host grab --input --timestamp --output [--ffmpeg]` subcommand in `app/src/host_main.cpp`, reusing `host::extract_frame` with the same shell-metachar refusal and output verification as `preview`.
+- Electron `video:grab` now spawns the sidecar (resolved alongside the app resources, then on PATH) and falls back to direct `ffmpeg` spawning; the new `preview:apply` IPC prefers `chromainvert-host preview` with a direct `ffmpeg lut3d` fallback, exposed through the preload bridge and `GuiBridge`.
+- Docs define the C++ role going forward: Electron GUI is the product path, `chromainvert-host` is the FFmpeg sidecar for GUI and CLI use, and the Win32 host is marked legacy fallback in an `app/src/main.cpp` header note; no files deleted.
+- Verified: CMake configure plus build passes on Windows (Ninja, GCC 13.2), sidecar `grab` smoke-tested on generated footage, and `npm run typecheck` passes. Engine untouched, so no pytest run.
+
 ## 2026-11-04: GUI uses the host-domain Apple Log path
 
 Completed:
