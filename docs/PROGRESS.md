@@ -1,5 +1,14 @@
 # ChromaInvert Progress Log
 
+## 2026-11-05: Revert icon unpacking, mac and linux installers green again
+
+Completed:
+- Removed `assets/icon.png` plus `assets/icon.ico` from `asarUnpack` in `app/gui/package.json`: listing them in both `files` and `asarUnpack` made the macOS and Linux packagers crash with `EEXIST` hard-linking the same file into the asar and unpacked trees (Windows tolerated it). The runtime `windowIcon()` fallback already covers the packed layout by resolving the in-asar copy, and the real taskbar fix (rcedit embedding via the restored `signAndEditExecutable` default) is untouched.
+
+Verified:
+- `package.json` parses; `asarUnpack` now matches the `main` layout that passed macOS plus Linux CI.
+- Still to confirm: CI matrix green on the PR.
+
 ## 2026-11-05: Full pipeline build proves the exe icon fix
 
 Completed:

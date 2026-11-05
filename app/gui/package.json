@@ -89,9 +89,7 @@
     },
     "asarUnpack": [
       "node_modules/ffmpeg-static/ffmpeg*",
-      "node_modules/ffprobe-static/bin/**/*",
-      "assets/icon.png",
-      "assets/icon.ico"
+      "node_modules/ffprobe-static/bin/**/*"
     ]
   }
 }
