@@ -266,7 +266,7 @@ function bundledEnginePath(): string {
   if (app.isPackaged) {
     return join(process.resourcesPath, "engine-bin", engineExeName());
   }
-  return join(__dirname, "..", "engine-bin", engineBinPlatform(), engineExeName());
+  return join(__dirname, "..", "..", "engine-bin", engineBinPlatform(), engineExeName());
 }
 
 function unpackedPath(path: string): string {

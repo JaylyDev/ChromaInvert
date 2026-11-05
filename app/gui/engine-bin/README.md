@@ -19,5 +19,6 @@ app/gui/engine-bin/linux/chromainvert-engine
 `electron-builder` copies `engine-bin/${os}` into `<resources>/engine-bin/`
 (see the `extraResources` entry in `app/gui/package.json`), so the packaged
 GUI finds the binary next to `process.resourcesPath` with no Python required.
-Binaries are gitignored; only the `.gitkeep` placeholders are committed, so
-packaging still succeeds when no binary was staged.
+Binaries and staging dirs are gitignored; every `dist*` script runs
+`scripts/ensure-engine-bin.js` first so packaging still succeeds when no
+binary was staged.
