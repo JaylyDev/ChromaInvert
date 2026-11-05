@@ -54,3 +54,16 @@ export interface FrameGrab {
   timestamp: number;
   error: string;
 }
+
+export interface EnvStatus {
+  python: string;
+  engineOk: boolean;
+  engineVersion: string;
+  torchOk: boolean;
+  torchVersion: string;
+  cuda: boolean;
+}
+
+export interface SetupProgress {
+  percent: number;
+}

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { getBridge, isDesktop } from "./api";
-import type { JobConfig, VideoProbe } from "./types";
-import { RunPhase } from "./types";
+import type { DoneResult, EnvStatus, JobConfig, ProgressUpdate, VideoProbe } from "../electron/types";
+import { RunPhase } from "../electron/types";
 
 interface FrameListProps {
   title: string;
@@ -179,6 +179,12 @@ export default function App(): JSX.Element {
   const [status, setStatus] = useState<string>("Idle. Pick frames, then press Match.");
   const [errors, setErrors] = useState<string[]>([]);
   const [log, setLog] = useState<string>("");
+  const [env, setEnv] = useState<EnvStatus | null>(null);
+  const [envChecking, setEnvChecking] = useState<boolean>(false);
+  const [setupRunning, setSetupRunning] = useState<boolean>(false);
+  const [setupPercent, setSetupPercent] = useState<number>(0);
+  const [setupMessage, setSetupMessage] = useState<string>("");
+  const [setupLog, setSetupLog] = useState<string>("");
   const logRef = useRef<HTMLPreElement | null>(null);
   const [sourceVideo, setSourceVideo] = useState<string>("");
   const [referenceVideo, setReferenceVideo] = useState<string>("");
@@ -254,6 +260,22 @@ export default function App(): JSX.Element {
     bridge.onLog((line) => {
       setLog((prev) => (prev + line + "\n").slice(-12000));
     });
+    bridge.onSetupProgress((update) => {
+      setSetupPercent(update.percent);
+    });
+    bridge.onSetupLog((line) => {
+      setSetupLog((prev) => (prev + line + "\n").slice(-2000));
+    });
+    setEnvChecking(true);
+    bridge.checkEnv().then(
+      (status) => {
+        setEnv(status);
+        setEnvChecking(false);
+      },
+      () => {
+        setEnvChecking(false);
+      }
+    );
   }, []);
 
   useEffect(() => {
@@ -674,6 +696,84 @@ export default function App(): JSX.Element {
         setStatus("Cancel request was unavailable.");
       }
     );
+  };
+
+  const refreshEnv = (): void => {
+    const bridge = getBridge();
+    if (bridge === null) {
+      return;
+    }
+    setEnvChecking(true);
+    bridge.checkEnv().then(
+      (status) => {
+        setEnv(status);
+        setEnvChecking(false);
+      },
+      () => {
+        setEnvChecking(false);
+      }
+    );
+  };
+
+  const onSetup = (): void => {
+    const bridge = getBridge();
+    if (bridge === null) {
+      return;
+    }
+    setSetupRunning(true);
+    setSetupPercent(0);
+    setSetupMessage("Installing the engine via pip. This downloads torch plus numpy and imageio and can take several minutes.");
+    setSetupLog("");
+    bridge.setupEnv().then(
+      (result) => {
+        setSetupRunning(false);
+        setSetupMessage(result.summary);
+        if (result.exitCode === 0) {
+          setSetupPercent(100);
+        }
+        refreshEnv();
+      },
+      () => {
+        setSetupRunning(false);
+        setSetupMessage("Setup request failed.");
+      }
+    );
+  };
+
+  const onCancelSetup = (): void => {
+    const bridge = getBridge();
+    if (bridge === null) {
+      return;
+    }
+    bridge.cancelSetup().then(
+      () => {
+        setSetupRunning(false);
+        setSetupMessage("Cancelled. Press Install to try again.");
+      },
+      () => {
+        setSetupMessage("Cancel request was unavailable.");
+      }
+    );
+  };
+
+  const envEngineText = (): string => {
+    if (env === null) {
+      return "checking...";
+    }
+    if (!env.engineOk) {
+      return "missing";
+    }
+    return env.engineVersion === "" ? "ok" : "ok (" + env.engineVersion + ")";
+  };
+
+  const envTorchText = (): string => {
+    if (env === null) {
+      return "checking...";
+    }
+    if (!env.torchOk) {
+      return "missing";
+    }
+    return "ok (" + env.torchVersion + (env.cuda ? ", CUDA" : ", CPU") + ")";
   };
 
   const renderVideoBlock = (kind: string): JSX.Element => {
@@ -1183,6 +1283,51 @@ export default function App(): JSX.Element {
         </div>
 
         <div className="column">
+          {desktop && env !== null && !env.engineOk && (
+            <section className="card" aria-label="Environment">
+              <h2>Environment</h2>
+              <p className="hint">
+                The engine is not installed yet. Install it once via pip, then Match works offline.
+              </p>
+              <ul className="file-list">
+                <li className="file-item">
+                  <code>Python: {env.python === "" ? "not found on PATH" : env.python}</code>
+                </li>
+                <li className="file-item">
+                  <code>Engine: {envEngineText()}</code>
+                </li>
+                <li className="file-item">
+                  <code>Torch: {envTorchText()}</code>
+                </li>
+              </ul>
+              {setupRunning && (
+                <div className="progress-wrap" style={{ marginTop: 12 }}>
+                  <progress value={setupPercent} max={100} aria-label="Setup progress" />
+                  <div className="progress-meta">{setupPercent}%</div>
+                </div>
+              )}
+              {setupMessage !== "" && <span className="hint">{setupMessage}</span>}
+              <div className="row" style={{ marginTop: 12 }}>
+                {!setupRunning ? (
+                  <button type="button" className="primary" onClick={onSetup} disabled={envChecking}>
+                    Install engine
+                  </button>
+                ) : (
+                  <button type="button" onClick={onCancelSetup}>
+                    Cancel
+                  </button>
+                )}
+                <button type="button" className="ghost" onClick={refreshEnv} disabled={envChecking || setupRunning}>
+                  Recheck
+                </button>
+              </div>
+              {setupLog !== "" && (
+                <pre className="log" aria-label="Setup log" tabIndex={0} style={{ marginTop: 12 }}>
+                  {setupLog}
+                </pre>
+              )}
+            </section>
+          )}
           <section className="card" aria-label="Run">
             <h2>
               <span className="step-num" aria-hidden="true">

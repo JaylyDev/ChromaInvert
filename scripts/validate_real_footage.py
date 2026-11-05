@@ -7,7 +7,7 @@ import imageio.v2 as imageio
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "engine"))
+sys.path.insert(0, str(ROOT / "engine" / "src"))
 
 from chromainvert.color import delta_e_2000, linear_srgb_to_lab, srgb_to_linear
 from chromainvert.cube import read_cube
