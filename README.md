@@ -40,14 +40,14 @@ Start with the app. Grab the installer from GitHub Releases and launch ChromaInv
 To build that installer from source:
 
 ```powershell
-cd app/gui
+cd app
 npm ci
 npm run typecheck
 npm run build
 npm run dist
 ```
 
-Installers land in `app/gui/release/`. For dev, run `npm run dev` plus `npm run electron:dev` in a second terminal.
+Installers land in `app/release/`. For dev, run `npm run dev` plus `npm run electron:dev` in a second terminal.
 
 ## Download and use the GUI
 
@@ -82,7 +82,7 @@ One command demo (writes `work/demo/` with `out.cube`, `graded.mp4`, `before.png
 python scripts/run_demo.py --source "<clip.mov>" --reference "<reference.mov>" --workdir work/demo
 ```
 
-For anything else, read the source doc: run of show in `docs/DEMO_SCRIPT.md`, frame job example in `assets/job.json.example`, GUI build in `app/gui/README.md`.
+For anything else, read the source doc: run of show in `docs/DEMO_SCRIPT.md`, frame job example in `assets/job.json.example`, GUI build in `app/README.md`.
 
 ## How it works
 
@@ -92,7 +92,7 @@ Electron writes `work/job.json` and spawns `python -m chromainvert run`. The eng
 
 - `engine/chromainvert/`: color decoders, losses, optimizer, predictor, CLI
 - `engine/tests/`: one test module per engine module
-- `app/gui/`: Electron plus React product GUI
+- `app/`: Electron plus React product GUI
 - `scripts/`: demo and validation helpers
 - `docs/`: plan, architecture, demo script, Premiere checks, build log
 - `data/`: bring your own LUTs and weights (gitignored, no checkpoint shipped)

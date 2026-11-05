@@ -9,6 +9,16 @@ Verified:
 - `package.json` parses; `asarUnpack` now matches the `main` layout that passed macOS plus Linux CI.
 - Still to confirm: CI matrix green on the PR.
 
+## 2026-11-05: GUI moved from app/gui to app
+
+Completed:
+- Moved the Electron GUI root up one level (`app/gui/*` to `app/*`: `assets`, `electron`, `src`, `index.html`, `package.json`, lockfile, configs; merged the two READMEs into one `app/README.md`). No source content changed, only paths.
+- Updated every reference: both workflows (`working-directory`, `cache-dependency-path`, artifact path), `AGENTS.md` parts list and build commands, root `README.md` layout plus quickstart, and `docs/GUI_DECISION.md` build steps. `docs/PROGRESS.md` history keeps the old paths as written.
+
+Verified:
+- `npm run typecheck`, `npm run build`, `npm run dist:dir`, and full `npm run dist` pass from `app/`; the packaged exe embeds the dotted-cube icon (viewed the extracted icon).
+- `python -m pytest engine/tests -q`: 130 passed, 1 skipped; both workflow YAMLs parse.
+
 ## 2026-11-05: Full pipeline build proves the exe icon fix
 
 Completed:
