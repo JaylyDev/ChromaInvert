@@ -68,7 +68,7 @@ python scripts/premiere_validation.py --cube work/out.cube --source work/src_fra
 
 ## Quickstart (reproducible)
 
-Prerequisites: Windows PowerShell from the repo root, Python 3.10 or newer, FFmpeg 7 or newer (tested on 7 and 9) plus ffprobe on PATH, a CUDA PyTorch install for GPU speed (CPU works in degraded mode).
+Prerequisites: Windows PowerShell from the repo root, Python 3.10 or newer, FFmpeg 7 or newer plus ffprobe on PATH, a CUDA PyTorch install for GPU speed (CPU works in degraded mode).
 
 ```powershell
 python -m venv .venv --system-site-packages
@@ -149,7 +149,7 @@ To use ChromaInvert (consumers):
 | Python | 3.10 or newer (CI runs 3.11) | `requires-python = ">=3.10"` in `engine/pyproject.toml` |
 | Python packages | `torch>=2.0`, `numpy>=1.26`, `imageio>=2.30`, plus `pytest>=8` for tests | Installed with `pip install -e ./engine` (dev extras via `./engine[dev]`) |
 | CUDA | Optional | The venv reuses the system GPU PyTorch install via `--system-site-packages`, so no large CUDA download is needed; without a GPU the engine runs in CPU degraded mode |
-| FFmpeg plus ffprobe | FFmpeg 7 or newer (tested on 7 and 9) on PATH | Frame extraction, `lut3d` preview and graded export |
+| FFmpeg plus ffprobe | FFmpeg 7 or newer on PATH | Frame extraction, `lut3d` preview and graded export |
 
 Install the engine from the repo root:
 
