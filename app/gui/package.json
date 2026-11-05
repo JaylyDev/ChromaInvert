@@ -7,7 +7,7 @@
   "description": "ChromaInvert product GUI: Electron + React driving the job.json contract",
   "license": "Apache-2.0",
   "main": "dist/electron/main.js",
-  "name": "chromainvert-gui",
+  "name": "chromainvert",
   "private": true,
   "scripts": {
     "build": "tsc --noEmit -p tsconfig.json && vite build && tsc -p tsconfig.electron.json && node -e \"require('fs').writeFileSync('dist/electron/package.json',JSON.stringify({type:'commonjs'}))\"",
@@ -58,7 +58,6 @@
         "nsis",
         "portable"
       ],
-      "signAndEditExecutable": false,
       "icon": "assets/icon.ico",
       "files": [
         "!node_modules/ffprobe-static/bin/{darwin,linux}/**/*"
@@ -84,9 +83,15 @@
         "!node_modules/ffprobe-static/bin/{darwin,win32}/**/*"
       ]
     },
+    "nsis": {
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
+    },
     "asarUnpack": [
       "node_modules/ffmpeg-static/ffmpeg*",
-      "node_modules/ffprobe-static/bin/**/*"
+      "node_modules/ffprobe-static/bin/**/*",
+      "assets/icon.png",
+      "assets/icon.ico"
     ]
   }
 }

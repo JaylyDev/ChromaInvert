@@ -33,7 +33,7 @@ Full gates and probe numbers are in `report.json` and `docs/PREMIERE_VALIDATION.
 
 ## Quickstart
 
-Start with the app. Grab the installer from GitHub Releases and launch ChromaInvert. Pick a source clip and a reference frame. Choose the output `.cube` path and press Match. The packaged app needs nothing else: the engine and FFmpeg ship inside it.
+Start with the app. Grab the installer from GitHub Releases and launch ChromaInvert (see Download and use the GUI below). Pick a source clip and a reference frame. Choose the output `.cube` path and press Match. The packaged app ships FFmpeg inside it and installs the engine via pip on first run.
 
 ![ChromaInvert GUI showing video import and run panels](assets/gui-screenshot.png)
 
@@ -48,6 +48,23 @@ npm run dist
 ```
 
 Installers land in `app/gui/release/`. For dev, run `npm run dev` plus `npm run electron:dev` in a second terminal.
+
+## Download and use the GUI
+
+Prebuilt installers are attached to each GitHub Release (`v*` tags): https://github.com/JaylyDev/ChromaInvert/releases
+
+- Windows: run `ChromaInvert Setup <version>.exe` to install, or launch the portable `ChromaInvert <version>.exe` with no install. The builds are unsigned, so SmartScreen may ask for confirmation on first launch.
+- macOS: open the `.dmg` and drag ChromaInvert to Applications. The build is unsigned, so if Gatekeeper blocks the first launch, right-click the app and choose Open.
+- Linux: make the `.AppImage` executable and run it, or install the `.deb` with `dpkg -i`.
+
+First run: FFmpeg ships inside the app. The engine installs once via the Environment panel: press Install engine with Python 3.10 or newer on PATH and internet access (installs `chromainvert` from PyPI with torch, numpy, and imageio; it can take several minutes). Reference-only predict mode additionally needs a weights `.pt` file: train one with `scripts/train_lut_predictor.py` and pick it in the weights field.
+
+Basic Match workflow in the app:
+
+1. Footage: add ungraded source frames and graded reference frames, or import the source and reference videos and capture matching frames into the lists.
+2. Output: pick the output `.cube` path (`job.json` and `report.json` land next to it).
+3. Grade settings: the input profile decodes the source frames and the reference profile decodes the graded reference (Auto resolves log sources such as Apple Log to `rec709`). Strength blends the result back toward identity.
+4. Run: press Match and watch the progress bar, status, and log; Cancel stops the engine. Load the exported cube as the Input LUT in Premiere (Apple Log cubes expect the Lumetri Input LUT slot), or apply it with FFmpeg `lut3d`.
 
 Use the engine directly for the keyless check or for scripting. Needs Python 3.10 or newer, FFmpeg 7 or newer with ffprobe on PATH. A CUDA torch build helps; CPU runs slower.
 

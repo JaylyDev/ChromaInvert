@@ -6,10 +6,8 @@ its stdout JSONL progress protocol. See `docs/GUI_DECISION.md` for the
 Electron decision (Qt rejected for licensing, ImGui rejected as too developer
 focused).
 
-The former C++ hosts (Win32 desktop fallback plus `chromainvert-host`
-console driver) were removed: the GUI ships its own FFmpeg binaries via
-`ffmpeg-static` and `ffprobe-static`, so the C++ FFmpeg sidecar has no role
-left. The Python mirror of the old helpers lives in
+The GUI ships its own FFmpeg binaries via `ffmpeg-static` and
+`ffprobe-static`. The Python mirror of the old helpers lives in
 `scripts/ffmpeg_helpers.py`.
 
 ## Product GUI (Electron + React, in `gui/`)

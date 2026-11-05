@@ -1,7 +1,7 @@
 # ChromaInvert: Detailed Hackathon Plan
 
 Status: planning document, extends the initial technical architecture spec
-Assumption stated up front: 36 hour hackathon, 2 core developers (Python/color and C++/app), plus optional floating help for testing, demo assets, and presentation. Scaling notes for 24 and 48 hours are in Section 14. If the team or duration differs, cut from the stretch list first, never from the end-to-end slice in Section 5.
+Assumption stated up front: 36 hour hackathon, 2 core developers (Python/color and app), plus optional floating help for testing, demo assets, and presentation. Scaling notes for 24 and 48 hours are in Section 14. If the team or duration differs, cut from the stretch list first, never from the end-to-end slice in Section 5.
 
 Success in one sentence: a judge can pick an ungraded clip and a reference frame, click Match, watch progress, preview a stable graded result with before/after and scopes, and export a `.cube` that loads in FFmpeg, DaVinci Resolve, and Premiere Pro and produces the same grade there.
 
@@ -81,7 +81,7 @@ This gives a numeric success criterion (Section 11) instead of "looks good to us
 
 - [ ] 1D spline pre-curves plus 3D lattice joint optimization.
 - [ ] Multi-frame reference (average distribution over 3 to 5 reference frames) and multi-shot source sampling.
-- [ ] Embedded Python (pybind11/PyTorch C++) instead of subprocess; live LUT preview while optimizing.
+- [ ] Embedded Python (pybind11/PyTorch binding) instead of subprocess; live LUT preview while optimizing.
 - [ ] Batch mode: one reference, many clips. Linux build verified in CI or a VM.
 
 ---
@@ -89,7 +89,7 @@ This gives a numeric success criterion (Section 11) instead of "looks good to us
 ## 4. System Architecture
 
 ```
-+------------------------- C++ desktop app -------------------------+
++------------------------- desktop app -------------------------+
 | file pickers | job runner | preview (FFmpeg lut3d) | scopes | log |
 +----+--------------------+----------------------+------------------+
      | writes             | reads                | reads
@@ -107,7 +107,7 @@ This gives a numeric success criterion (Section 11) instead of "looks good to us
 
 Process model for the hackathon: subprocess plus files. No shared memory, no embedded interpreter, no sockets. Rationale: independently debuggable, the CLI is the contract, and either side can be developed against canned files.
 
-`job.json` written by C++ (or the CLI):
+`job.json` written by the app (or the CLI):
 
 ```json
 {
@@ -129,7 +129,7 @@ Process model for the hackathon: subprocess plus files. No shared memory, no emb
 Engine guarantees:
 
 - Exit code 0 on success, nonzero with a final `{"event":"error","message":"..."}` line on failure.
-- Progress on stdout as JSON Lines, flushed per line, e.g. `{"event":"progress","iter":120,"iters":400,"loss":0.031,"elapsed_s":1.8}` and `{"event":"done","cube":"work/out.cube","seconds":4.2}`. C++ parses line by line to drive the progress bar; no regex on prose logs.
+- Progress on stdout as JSON Lines, flushed per line, e.g. `{"event":"progress","iter":120,"iters":400,"loss":0.031,"elapsed_s":1.8}` and `{"event":"done","cube":"work/out.cube","seconds":4.2}`. The app parses line by line to drive the progress bar; no regex on prose logs.
 - `report.json` with final loss terms, DeltaE self-check numbers, lattice stats (min/max, max neighbor delta), device used (cuda/cpu), and library versions. This file feeds the demo screen and the bug reports.
 - Deterministic given `seed` and identical inputs.
 
@@ -137,7 +137,7 @@ Frame exchange format: 16-bit PNG for stills (or half-float EXR if OpenEXR is al
 
 ### 4.2 Why not embedded Python first
 
-Embedding (Python C API or pybind11 plus Torch) couples crash domains, build systems, and GPU DLL loading, and typically eats half a hackathon. Subprocess keeps the C++ app shippable even with a CPU-only engine. Embedding is a stretch item only.
+Embedding (Python C API or pybind11 plus Torch) couples crash domains, build systems, and GPU DLL loading, and typically eats half a hackathon. Subprocess keeps the app shippable even with a CPU-only engine. Embedding is a stretch item only.
 
 ---
 
@@ -148,7 +148,7 @@ Rule: no component is "done" alone. Build in this order and keep the pipeline ru
 1. `.cube` writer plus reader round-trip in Python, validated by FFmpeg `lut3d` on a test image. Verify: FFmpeg applies the exported identity LUT and the output is pixel-identical (or within 1 code value) to the input.
 2. `DifferentiableLUT3D` forward pass with identity lattice reproduces the input image. Verify: unit test, max abs error below 1e-5.
 3. Optimizer with distribution loss on the synthetic benchmark (Section 2.2), CLI only. Verify: recovered LUT beats identity baseline on held-out DeltaE.
-4. C++ FFmpeg frame extraction plus `lut3d` preview of a hardcoded `.cube`. Verify: app shows graded frame.
+4. FFmpeg frame extraction plus `lut3d` preview of a hardcoded `.cube`. Verify: app shows graded frame.
 5. Connect 3 and 4 through `job.json`. This is the MVP. Verify: full click-to-graded-preview run.
 6. Only then: masks, scopes polish, extra color profiles, Premiere MCP tests.
 
@@ -238,7 +238,7 @@ Rule: FFmpeg stream color metadata is read and displayed in the app (primaries, 
 
 ---
 
-## 8. C++ Desktop App Plan (Owner: C++/FFmpeg Developer)
+## 8. Desktop App Plan (Owner: App/FFmpeg Developer)
 
 ### 8.1 Stack decision (decide in hour 1, do not revisit)
 
@@ -257,7 +257,7 @@ FFmpeg integration, two levels:
 
 ```
 app/
-  CMakeLists.txt            # C++17, vcpkg toolchain, Qt6 or ImGui+GLFW, FFmpeg (target level 2)
+  CMakeLists.txt            # portable standard, vcpkg toolchain, Qt6 or ImGui+GLFW, FFmpeg (target level 2)
   vcpkg.json
   src/
     main.cpp
@@ -277,7 +277,7 @@ assets/ icons, sample project
 - Bottom: collapsible log pane showing the exact ffmpeg commands and engine JSONL tail. Judges and engineers trust visible pipelines.
 - Scopes (target): four small panels: reference histogram, graded histogram, vectorscope overlay, loss curve. If time forces a cut, keep histograms and drop the vectorscope rendering, but keep the vectorscope numbers in `report.json`.
 
-### 8.4 C++ responsibilities checklist
+### 8.4 App responsibilities checklist
 
 - [ ] CMake + vcpkg build green on the demo laptop first, second OS only if time (Windows primary; Linux is "also builds" honesty, not a promise).
 - [ ] `ffprobe` metadata parse: codec, resolution, fps, primaries/transfer/matrix/range; display and pass to job file.
@@ -359,7 +359,7 @@ If a target is missed, the number still goes in the README. Measured honesty bea
 ### 12.1 Roles
 
 - Python/Color (Role 1): engine, losses, color profiles, spline, benchmark, `.cube` export, metrics script for Premiere stills. Owns Sections 6, 7, 9, 11 numbers.
-- C++/App (Role 2): app shell, FFmpeg pipeline, job runner, preview/scopes, packaging. Owns Sections 8 and the demo machine.
+- App (Role 2): app shell, FFmpeg pipeline, job runner, preview/scopes, packaging. Owns Sections 8 and the demo machine.
 - Floating/everyone: test assets and licenses, README, slides, demo rehearsal, Premiere/Resolve validation sessions. If a third or fourth member exists, give them validation plus demo assets full-time; it is the highest-leverage non-coding role.
 
 ### 12.2 Working agreements
@@ -389,7 +389,7 @@ ChromaInvert/
 
 ## 13. Timeline (36 Hour Assumption)
 
-| Time | Python/Color | C++/App | Joint gate |
+| Time | Python/Color | App | Joint gate |
 |---|---|---|---|
 | H0 to H2 | Env, deps pinned, `.cube` writer, identity test | Toolchain decision, CMake skeleton, ffmpeg/ffprobe check | Contract frozen; identity LUT round-trips through FFmpeg |
 | H2 to H6 | DifferentiableLUT3D + distribution loss on benchmark | Subprocess FFmpeg extract + `lut3d` preview, app skeleton | Benchmark v0 numbers printed |

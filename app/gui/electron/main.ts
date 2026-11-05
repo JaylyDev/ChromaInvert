@@ -1,11 +1,11 @@
-import { app, BrowserWindow, Menu, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage } from "electron";
 import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import ffmpegStaticPath from "ffmpeg-static";
 import { path as ffprobeStaticPath } from "ffprobe-static";
-import type { FileFilter, IpcMainInvokeEvent } from "electron";
+import type { FileFilter, IpcMainInvokeEvent, NativeImage } from "electron";
 import type { DoneResult, EnvStatus, FrameGrab, JobConfig, ProgressUpdate, SetupProgress, VideoProbe } from "./types";
 
 interface ProgressLine {
@@ -407,8 +407,25 @@ function parseLine(line: string, sender: Electron.WebContents): void {
     );
 }
 
+// Unpacked assets first (asar paths do not serve native icons reliably);
+// the in-asar copy is the backup. Logs the winner for icon debugging.
+function windowIcon(): NativeImage {
+  const names = [
+    join(process.resourcesPath, "app.asar.unpacked", "assets", "icon.png"),
+    join(app.getAppPath(), "assets", "icon.png")
+  ];
+  for (const name of names) {
+    const image = nativeImage.createFromPath(name);
+    if (!image.isEmpty()) {
+      console.log("window icon: " + name);
+      return image;
+    }
+  }
+  console.log("window icon: none found, using default");
+  return nativeImage.createEmpty();
+}
+
 function createWindow(): void {
-  const here = __dirname;
   const win = new BrowserWindow({
     width: 1180,
     height: 820,
@@ -416,15 +433,15 @@ function createWindow(): void {
     minHeight: 640,
     title: "ChromaInvert",
     autoHideMenuBar: true,
-    icon: join(here, "../../assets/icon.png"),
-    webPreferences: { preload: join(here, "preload.js") }
+    icon: windowIcon(),
+    webPreferences: { preload: join(__dirname, "preload.js") }
   });
   win.setMenu(null);
   const devUrl = process.env.VITE_DEV_SERVER_URL;
   if (devUrl !== undefined && devUrl !== "") {
     void win.loadURL(devUrl);
   } else {
-    void win.loadFile(join(here, "../index.html"));
+    void win.loadFile(join(app.getAppPath(), "dist", "index.html"));
   }
 }
 
@@ -737,6 +754,9 @@ ipcMain.handle("env:cancel", (): Promise<void> => {
   setupChild = null;
   return Promise.resolve();
 });
+
+// Taskbar grouping and icon identity on Windows key off this value.
+app.setAppUserModelId("com.chromainvert.gui");
 
 void app.whenReady().then(() => {
   Menu.setApplicationMenu(null);

@@ -16,14 +16,14 @@ that limitation on the slide. True log working space is roadmap, not demo.
 - `.venv` created per `AGENTS.md` with the engine installed editable.
 - FFmpeg 7 or 9 on PATH (`ffmpeg -version`, `ffprobe -version`).
 - Sample footage on disk (local only, never committed):
-  `C:\Users\lokwa\Documents\SampleFootage\Rec709\A001_10290006_C101.mov`
-  `C:\Users\lokwa\Documents\SampleFootage\Apple Log\A001_10290006_C100.mov`
+  `$HOME\Documents\SampleFootage\Rec709\A001_10290006_C101.mov`
+  `$HOME\Documents\SampleFootage\Apple Log\A001_10290006_C100.mov`
 - Pre-run once: `python scripts/run_demo.py --help` and one full dry run.
 
 ## One command dry run (about 30 seconds on GPU)
 
 ```powershell
-python scripts/run_demo.py --source "C:\Users\lokwa\Documents\SampleFootage\Rec709\A001_10290006_C101.mov" --reference "C:\Users\lokwa\Documents\SampleFootage\Apple Log\A001_10290006_C100.mov" --workdir work/demo
+python scripts/run_demo.py --source "$HOME\Documents\SampleFootage\Rec709\A001_10290006_C101.mov" --reference "$HOME\Documents\SampleFootage\Apple Log\A001_10290006_C100.mov" --workdir work/demo
 ```
 
 Outputs in `work/demo/`: `src_*.png`, `ref_000.png`, `job.json`, `out.cube`,
@@ -33,7 +33,7 @@ Outputs in `work/demo/`: `src_*.png`, `ref_000.png`, `job.json`, `out.cube`,
 Fast smoke variant (CPU safe, about 15 seconds):
 
 ```powershell
-python scripts/run_demo.py --source "C:\Users\lokwa\Documents\SampleFootage\Rec709\A001_10290006_C101.mov" --reference "C:\Users\lokwa\Documents\SampleFootage\Apple Log\A001_10290006_C100.mov" --workdir work/demo-fast --iterations 100 --fine-iterations 10 --preview-secs 2 --skip-benchmark
+python scripts/run_demo.py --source "$HOME\Documents\SampleFootage\Rec709\A001_10290006_C101.mov" --reference "$HOME\Documents\SampleFootage\Apple Log\A001_10290006_C100.mov" --workdir work/demo-fast --iterations 100 --fine-iterations 10 --preview-secs 2 --skip-benchmark
 ```
 
 ## Run of show
@@ -56,7 +56,7 @@ different shoot. Contract v1 decodes both as Rec.709 display-referred.
 Do:
 
 ```powershell
-python scripts/run_demo.py --source "C:\Users\lokwa\Documents\SampleFootage\Rec709\A001_10290006_C101.mov" --reference "C:\Users\lokwa\Documents\SampleFootage\Apple Log\A001_10290006_C100.mov" --workdir work/demo
+python scripts/run_demo.py --source "$HOME\Documents\SampleFootage\Rec709\A001_10290006_C101.mov" --reference "$HOME\Documents\SampleFootage\Apple Log\A001_10290006_C100.mov" --workdir work/demo
 ```
 
 Narrate while it runs: frames sampled at fixed fractions, lattice starts at
@@ -75,7 +75,7 @@ Do: show the equivalent FFmpeg command (repo root paths; the script runs the
 same filter with cwd `work/demo` plus explicit encode flags):
 
 ```powershell
-ffmpeg -y -ss 2 -t 3 -i "C:\Users\lokwa\Documents\SampleFootage\Rec709\A001_10290006_C101.mov" -vf lut3d=file=work/demo/out.cube -c:v libx264 -pix_fmt yuv420p -color_primaries bt709 -color_trc bt709 -colorspace bt709 work/demo/graded.mp4
+ffmpeg -y -ss 2 -t 3 -i "$HOME\Documents\SampleFootage\Rec709\A001_10290006_C101.mov" -vf lut3d=file=work/demo/out.cube -c:v libx264 -pix_fmt yuv420p -color_primaries bt709 -color_trc bt709 -colorspace bt709 work/demo/graded.mp4
 ```
 
 Show: pre-opened DaVinci Resolve with `out.cube` in the LUT folder applied to
