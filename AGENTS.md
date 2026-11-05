@@ -4,21 +4,21 @@ ChromaInvert is a perceptual video and LUT reverse-engineering engine. Matching 
 
 ## What this repo is
 
-Python engine plus Electron GUI monorepo. Python source lives under `engine/chromainvert/`, tests under `engine/tests/`. Planning docs live in `docs/`, helper scripts in `scripts/`, test footage notes in `assets/`, and the Electron product GUI in `app/gui/`. `work/` and `.venv/` are gitignored runtime and environment directories.
+Python engine plus Electron GUI monorepo. Python source lives under `engine/src/chromainvert/`, tests under `engine/tests/`. Planning docs live in `docs/`, helper scripts in `scripts/`, test footage notes in `assets/`, and the Electron product GUI in `app/gui/`. `work/` and `.venv/` are gitignored runtime and environment directories.
 
 ## Parts of the project
 
-- `engine/chromainvert/cube.py`: `.cube` read/write, lattice reshape and validation. Red varies fastest in file order, matching FFmpeg `lut3d` expectations.
-- `engine/chromainvert/lut_module.py`: `DifferentiableLUT3D`, the learnable `(1, 3, N, N, N)` volume sampled with `F.grid_sample`.
-- `engine/chromainvert/color.py`: sRGB transfers, Oklab and CIE Lab conversion, DeltaE2000, Sony S-Log3 and Apple Log decode, `decode_input` for the `rec709`, `rec2020`, `slog3`, and `apple_log` profiles.
-- `engine/chromainvert/losses.py`: quantile and moment distribution matching, covariance matching, TV smoothness, identity prior, skin and shadow anchors, gamut penalty.
-- `engine/chromainvert/masks.py`: YCbCr skin heuristic and luminance shadow masks.
-- `engine/chromainvert/spline.py`: separable Catmull-Rom upsampling for coarse-to-fine lattices.
-- `engine/chromainvert/optimize.py`: Adam optimization loop with seeded pixel sampling, the `OptimizeConfig` weights, and the `deterministic` GPU mode flag.
-- `engine/chromainvert/cli.py`: `chromainvert run job.json`, `chromainvert predict image`, and `chromainvert benchmark` entry points; `run` accepts `reference_only` jobs with `predict_weights`.
-- `engine/chromainvert-engine.spec`: PyInstaller directory-bundle recipe exposing the same CLI (`run`, `predict`, `benchmark`); single-file is avoided because torch's cuDNN DLLs fail to extract from a onefile archive on Windows. Build on each release platform, staged via `scripts/build_engine_bundle.py`.
-- `engine/chromainvert/lut_predictor.py`: single-image LUT predictor; 38 grade statistics plus a residual MLP around identity, 17 lattice spline-upsampled to 33. No checkpoint is shipped; checkpoints are never committed since they distill their training LUTs; see `data/README.md` and pass the file via `predict_weights` or `--weights`.
-- `engine/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000) plus the seeded random-RGB probe heldout gate and `style_probe_metrics` for LUT-to-LUT comparison on a random probe.
+- `engine/src/chromainvert/cube.py`: `.cube` read/write, lattice reshape and validation. Red varies fastest in file order, matching FFmpeg `lut3d` expectations.
+- `engine/src/chromainvert/lut_module.py`: `DifferentiableLUT3D`, the learnable `(1, 3, N, N, N)` volume sampled with `F.grid_sample`.
+- `engine/src/chromainvert/color.py`: sRGB transfers, Oklab and CIE Lab conversion, DeltaE2000, Sony S-Log3 and Apple Log decode, `decode_input` for the `rec709`, `rec2020`, `slog3`, and `apple_log` profiles.
+- `engine/src/chromainvert/losses.py`: quantile and moment distribution matching, covariance matching, TV smoothness, identity prior, skin and shadow anchors, gamut penalty.
+- `engine/src/chromainvert/masks.py`: YCbCr skin heuristic and luminance shadow masks.
+- `engine/src/chromainvert/spline.py`: separable Catmull-Rom upsampling for coarse-to-fine lattices.
+- `engine/src/chromainvert/optimize.py`: Adam optimization loop with seeded pixel sampling, the `OptimizeConfig` weights, and the `deterministic` GPU mode flag.
+- `engine/src/chromainvert/cli.py`: `chromainvert run job.json`, `chromainvert predict image`, and `chromainvert benchmark` entry points; `run` accepts `reference_only` jobs with `predict_weights`.
+- `engine/src/chromainvert/lut_predictor.py`: single-image LUT predictor; 38 grade statistics plus a residual MLP around identity, 17 lattice spline-upsampled to 33. No checkpoint is shipped; checkpoints are never committed since they distill their training LUTs; see `data/README.md` and pass the file via `predict_weights` or `--weights`.
+- `engine/src/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000) plus the seeded random-RGB probe heldout gate and `style_probe_metrics` for LUT-to-LUT comparison on a random probe.
+- `engine/LICENSE`: Apache-2.0 copy of the repo root license so the `engine/` sdist and wheel carry license files per PEP 639 (`license-files`).
 - `app/README.md`: Windows run steps for the Electron GUI.
 - `app/gui/package.json`, `app/gui/vite.config.ts`, `app/gui/index.html`: Electron + React product GUI shell (Vite renderer, TypeScript, no Qt); ships `engine-bin/${os}` via `extraResources`, unpacks `ffmpeg-static`/`ffprobe-static` via `asarUnpack` with a per-platform ffprobe prune.
 - `app/gui/engine-bin/`: per-platform bundled `chromainvert-engine` binaries (gitignored) plus README; every `dist*` script runs `scripts/ensure-engine-bin.js` so packaging succeeds with no binary staged.
@@ -44,7 +44,7 @@ Python engine plus Electron GUI monorepo. Python source lives under `engine/chro
 - `scripts/extract_frames.py`: extracts N frames from a video via FFmpeg.
 - `scripts/run_real_footage.py`: reusable driver for frame extraction, job creation, run, and validation with synthetic fallback.
 - `engine/tests/test_real_footage.py`: real-footage CLI and optimize smoke tests.
-- `engine/chromainvert/__main__.py`: enables `python -m chromainvert`.
+- `engine/src/chromainvert/__main__.py`: enables `python -m chromainvert`.
 - `assets/job.json.example`: tracked sample job for the real-footage CLI run.
 - `docs/CHROMAINVERT_HACKATHON_PLAN.md`: full technical plan and team guide.
 - `docs/ARCHITECTURE.md`: engine contract v2, backwards compatible with v1 (`job.json` schema, stdout JSONL protocol, `report.json` fields, color pipeline).

@@ -11,7 +11,7 @@ import torch
 from numpy.typing import NDArray
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "engine"))
+sys.path.insert(0, str(ROOT / "engine" / "src"))
 
 from chromainvert.benchmark import commercial_style_lattice, make_chart
 from chromainvert.color import delta_e_2000, linear_srgb_to_lab, srgb_to_linear

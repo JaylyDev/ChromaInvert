@@ -1,5 +1,18 @@
 # ChromaInvert Progress Log
 
+## 2026-11-05: engine adopts src layout for PyPI publishing
+
+Completed:
+- Moved `engine/chromainvert/` to `engine/src/chromainvert/`, keeping `engine/tests/` at the project root, matching the packaging tutorial project shape (`src/` package plus `tests/`).
+- Copied the repo root Apache-2.0 text to `engine/LICENSE` and expanded `engine/README.md` into a PyPI-friendly page (install, run/predict/benchmark quickstart, layout, license).
+- Reworked `engine/pyproject.toml`: setuptools>=77 backend, SPDX `license = "Apache-2.0"` with `license-files`, Homepage plus Issues URLs, `packages.find where = ["src"]`, pytest `pythonpath = ["src"]`; dropped the `License :: OSI Approved` trove classifier superseded by the PEP 639 expression.
+- Updated live path references in `AGENTS.md`, `docs/ARCHITECTURE.md`, and the `sys.path`/`PYTHONPATH` inserts in `scripts/*.py` (now `engine/src`); removed the stale `engine/chromainvert-engine.spec` bullet (spec file already deleted).
+
+Verified:
+- `python -m pip install -e ./engine`: success.
+- `python -m pytest engine/tests -q`: 130 passed, 1 skipped (ffmpeg not on PATH, unrelated to the move).
+- `python -m build` plus `twine check`: sdist and wheel both PASSED, wheel carries `licenses/LICENSE`.
+
 ## 2026-11-05: Remove C++ hosts (bundled FFmpeg supersedes the sidecar)
 
 Completed:
