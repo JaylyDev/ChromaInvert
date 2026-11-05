@@ -1,5 +1,54 @@
 # ChromaInvert Progress Log
 
+## 2026-11-05: PyInstaller bundle removed, engine installs via pip
+
+Completed:
+- Deleted the PyInstaller machinery (`scripts/build_engine_bundle.py`, `app/gui/engine-bin/`, `app/gui/scripts/ensure-engine-bin.cjs`, the `extraResources` engine-bin entry, and the `dist*` ensure prefixes). `main.ts` resolves the engine as `chromainvert` on PATH then `python -m chromainvert`; the Environment setup installs it via pip. Static `ffmpeg`/`ffprobe` shipping is unchanged.
+- Reworded install copy to install via pip (`App.tsx`, `main.ts` missing-engine message, both READMEs, `AGENTS.md`).
+
+Verified:
+- `npm run typecheck` and `npm run build`: pass.
+- `python -m pytest engine/tests -q`: 130 passed, 1 skipped (ffmpeg not on PATH, unrelated).
+
+## 2026-11-05: engine adopts src layout for PyPI publishing
+
+Completed:
+- Moved `engine/chromainvert/` to `engine/src/chromainvert/`, keeping `engine/tests/` at the project root, matching the packaging tutorial project shape (`src/` package plus `tests/`).
+- Copied the repo root Apache-2.0 text to `engine/LICENSE` and expanded `engine/README.md` into a PyPI-friendly page (install, run/predict/benchmark quickstart, layout, license).
+- Reworked `engine/pyproject.toml`: setuptools>=77 backend, SPDX `license = "Apache-2.0"` with `license-files`, Homepage plus Issues URLs, `packages.find where = ["src"]`, pytest `pythonpath = ["src"]`; dropped the `License :: OSI Approved` trove classifier superseded by the PEP 639 expression.
+- Updated live path references in `AGENTS.md`, `docs/ARCHITECTURE.md`, and the `sys.path`/`PYTHONPATH` inserts in `scripts/*.py` (now `engine/src`); removed the stale `engine/chromainvert-engine.spec` bullet (spec file already deleted).
+
+Verified:
+- `python -m pip install -e ./engine`: success.
+- `python -m pytest engine/tests -q`: 130 passed, 1 skipped (ffmpeg not on PATH, unrelated to the move).
+- `python -m build` plus `twine check`: sdist and wheel both PASSED, wheel carries `licenses/LICENSE`.
+
+## 2026-11-05: Remove C++ hosts (bundled FFmpeg supersedes the sidecar)
+
+Completed:
+- Deleted `app/CMakeLists.txt` and all of `app/src/` (Win32 desktop host, `chromainvert-host` console driver, `ffmpeg`/`Preview` modules): the GUI ships FFmpeg via static npm binaries, so the C++ sidecar has no role left. The Python mirror of the old helpers lives in `scripts/ffmpeg_helpers.py`.
+- Rewrote `app/README.md` as a GUI-only doc; dropped the `build-windows` CMake job from `.github/workflows/build.yml`.
+- Updated `README.md` layout, `docs/ARCHITECTURE.md` process model, and `AGENTS.md` (monorepo intro, Parts list, `tests.yml` description); recorded the superseding decision in `docs/GUI_DECISION.md`. Planning history in `docs/CHROMAINVERT_HACKATHON_PLAN.md` and older `docs/PROGRESS.md` entries are kept as a record.
+
+## 2026-11-05: GUI first-run environment setup with progress
+
+Completed:
+- New Environment card: on launch the GUI probes system Python (`import chromainvert`, torch version plus CUDA) and, when the engine is missing, offers one-click `pip install chromainvert` with a live progress bar parsed from pip output, cancellable, with the pip tail on failure.
+- Wiring: `env:check`/`env:setup`/`env:cancel` IPC plus `setup:progress`/`setup:log` events, bridge and shared types, `missingToolMessage` pointing at the setup panel. Verified `typecheck` plus `build`; probe JSON contract checked headlessly (`engineOk false`, torch `2.8.0+cu129` CUDA true); `pip install chromainvert` correctly reports no distribution until the PyPI publish lands.
+
+## 2026-11-05: GUI resolves static ffmpeg/ffprobe with fallback
+
+Completed:
+- Added `ffmpeg-static@5.3.0` and `ffprobe-static@3.1.0`: main requires them and rewrites `app.asar` to `app.asar.unpacked` when packaged; `asarUnpack` keeps both binaries executable outside the archive; per-platform `files` ignores ship only the current OS `ffprobe-static/bin` (the package carries all platforms, about 336 MB).
+- Centralized `resolveTool(ToolKind)` for ffmpeg, ffprobe, and the engine; `video:probe` and `video:grab` use the resolved paths; missing tools report reinstall-or-install guidance.
+- Added `app/gui/electron/ffprobe-static.d.ts` (`ffprobe-static` ships no types; `ffmpeg-static` ships its own).
+
+Verified:
+- `cd app/gui && npm run typecheck` and `npm run build`: pass.
+- Static binaries execute: ffmpeg 6.1.1, ffprobe 4.0.2.
+- `npm run dist:dir` on Windows: the unpacked layout holds `ffmpeg.exe` plus only `ffprobe-static/bin/win32` (darwin/linux pruned); both unpacked binaries print their versions.
+- `python -m pytest engine/tests -q`: 131 passed (engine code untouched).
+
 ## 2026-11-04: GUI uses the host-domain Apple Log path
 
 Completed:

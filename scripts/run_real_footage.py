@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "engine"))
+sys.path.insert(0, str(ROOT / "engine" / "src"))
 
 from extract_frames import extract_frames
 
@@ -167,7 +167,7 @@ def main() -> int:
 
     print(f"job written: {job_path}", flush=True)
     env = dict(os.environ)
-    env["PYTHONPATH"] = str(ROOT / "engine") + os.pathsep + env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = str(ROOT / "engine" / "src") + os.pathsep + env.get("PYTHONPATH", "")
     result = subprocess.run(
         [sys.executable, "-m", "chromainvert", "run", str(job_path)],
         cwd=str(ROOT),

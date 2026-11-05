@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "engine"))
+sys.path.insert(0, str(ROOT / "engine" / "src"))
 
 
 def _version(exe: str) -> Optional[str]:
@@ -325,7 +325,7 @@ class EngineRunner:
             json.dump(job, f)
         assert self.job_path is not None
         env = dict(os.environ)
-        engine_dir = str(ROOT / "engine")
+        engine_dir = str(ROOT / "engine" / "src")
         existing = env.get("PYTHONPATH", "")
         env["PYTHONPATH"] = engine_dir + os.pathsep + existing if existing else engine_dir
         self._stderr_file = tempfile.NamedTemporaryFile(mode="w", suffix=".chromainvert.stderr", delete=False)

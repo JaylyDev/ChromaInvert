@@ -2,7 +2,7 @@
 
 ## Process model
 
-The C++ desktop host drives the Python engine as a subprocess. No shared memory, no embedded interpreter, no sockets.
+The Electron GUI drives the Python engine as a subprocess. No shared memory, no embedded interpreter, no sockets.
 
 ```
 app --writes--> work/job.json --reads--> chromainvert run work/job.json
@@ -78,7 +78,7 @@ Full-range versus limited-range: the engine assumes full-range code values where
 
 `apple_log`: `decode_input` applies the Apple Log inverse OETF (`decode_apple_log` with the Apple Log Profile constants) to obtain linear Rec.2020, converts to linear Rec.709 via `rec2020_to_rec709_linear`, and clips to `[0, 1]` for a bounded SDR working space. Available under contract v1 and v2. This decodes source frames; reference frames use `reference_profile` (default `rec709` here, because graded references are display-referred).
 
-`slog3` and `slog3_sgamut3cine`: `decode_input` performs the bounded S-Log3 working-space transform defined in `engine/chromainvert/color.py`:
+`slog3` and `slog3_sgamut3cine`: `decode_input` performs the bounded S-Log3 working-space transform defined in `engine/src/chromainvert/color.py`:
 
 1. S-Log3 decode: Sony published curve from code in `[0, 1]` (0 to 1023 CV) to scene-referred linear reflection. Middle gray 0.18 maps to 420/1023 code, 0.9 reflectance to 598/1023, and 1.0 code to about 38.4 linear. Values below the knee (code < 171.21/1023) use the linear toe.
 2. Gamut matrix: S-Gamut3.Cine primaries to Rec.709 linear via the matrix derived from Sony primaries and colour-science data. The matrix preserves neutrals (row sums about 1) and is:

@@ -7,7 +7,7 @@ import imageio.v2 as imageio
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "engine"))
+sys.path.insert(0, str(ROOT / "engine" / "src"))
 
 from chromainvert.cube import CubeLut, identity_lattice, write_cube
 

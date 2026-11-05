@@ -4,32 +4,28 @@ ChromaInvert is a perceptual video and LUT reverse-engineering engine. Matching 
 
 ## What this repo is
 
-Python engine plus C++ desktop host monorepo. Python source lives under `engine/chromainvert/`, tests under `engine/tests/`. Planning docs live in `docs/`, helper scripts in `scripts/`, test footage notes in `assets/`, and the C++ app skeleton in `app/`. `work/` and `.venv/` are gitignored runtime and environment directories.
+Python engine plus Electron GUI monorepo. Python source lives under `engine/src/chromainvert/`, tests under `engine/tests/`. Planning docs live in `docs/`, helper scripts in `scripts/`, test footage notes in `assets/`, and the Electron product GUI in `app/gui/`. `work/` and `.venv/` are gitignored runtime and environment directories.
 
 ## Parts of the project
 
-- `engine/chromainvert/cube.py`: `.cube` read/write, lattice reshape and validation. Red varies fastest in file order, matching FFmpeg `lut3d` expectations.
-- `engine/chromainvert/lut_module.py`: `DifferentiableLUT3D`, the learnable `(1, 3, N, N, N)` volume sampled with `F.grid_sample`.
-- `engine/chromainvert/color.py`: sRGB transfers, Oklab and CIE Lab conversion, DeltaE2000, Sony S-Log3 and Apple Log decode, `decode_input` for the `rec709`, `rec2020`, `slog3`, and `apple_log` profiles.
-- `engine/chromainvert/losses.py`: quantile and moment distribution matching, covariance matching, TV smoothness, identity prior, skin and shadow anchors, gamut penalty.
-- `engine/chromainvert/masks.py`: YCbCr skin heuristic and luminance shadow masks.
-- `engine/chromainvert/spline.py`: separable Catmull-Rom upsampling for coarse-to-fine lattices.
-- `engine/chromainvert/optimize.py`: Adam optimization loop with seeded pixel sampling, the `OptimizeConfig` weights, and the `deterministic` GPU mode flag.
-- `engine/chromainvert/cli.py`: `chromainvert run job.json`, `chromainvert predict image`, and `chromainvert benchmark` entry points; `run` accepts `reference_only` jobs with `predict_weights`.
-- `engine/chromainvert/lut_predictor.py`: single-image LUT predictor; 38 grade statistics plus a residual MLP around identity, 17 lattice spline-upsampled to 33. No checkpoint is shipped; checkpoints are never committed since they distill their training LUTs; see `data/README.md` and pass the file via `predict_weights` or `--weights`.
-- `engine/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000) plus the seeded random-RGB probe heldout gate and `style_probe_metrics` for LUT-to-LUT comparison on a random probe.
-- `app/CMakeLists.txt`: builds both the Win32 `ChromaInvert` desktop host and the `chromainvert-host` console driver (C++17, standard library only); the desktop target also compiles the shared `ffmpeg` module and `Preview` for the upcoming preview pane.
-- `app/src/main.cpp`, `app/src/MainWindow.*`, `app/src/JobRunner.*`: Win32 desktop host fallback (file pickers, Match and Cancel, progress bar, log pane). JobRunner writes `job.json`, spawns the engine, parses stdout JSONL progress. Product GUI is Electron + React in `app/gui/` per `docs/GUI_DECISION.md`; no Qt port.
-- `app/src/host_main.cpp`: `chromainvert-host run` and `preview` subcommands, flag parsing, frame extraction orchestration.
-- `app/src/job_runner.h`, `app/src/job_runner.cpp`: `job.json` writer (contract v1), engine subprocess spawn with JSONL progress parsing, `report.json` summary.
-- `app/src/ffmpeg.h`, `app/src/ffmpeg.cpp`: unified FFmpeg Level 1 module: `host::` helpers (ffprobe duration probe, frame extraction, `lut3d` preview encode) for the console driver plus the `Ffmpeg` class (rich ffprobe JSON parse, multi-frame extraction with 16-bit plus 8-bit fallback, `lut3d` preview with tetrahedral interp, before/after grab) with unquoted double-level `lut3d` path escaping and output-directory creation.
-- `app/src/Preview.h`, `app/src/Preview.cpp`: graded preview encode plus before/after stills via the `Ffmpeg` class.
-- `app/README.md`: Windows build and run steps for the Electron GUI, both C++ hosts, shared module notes, Level 2 plan.
-- `app/gui/package.json`, `app/gui/vite.config.ts`, `app/gui/index.html`: Electron + React product GUI shell (Vite renderer, TypeScript, no Qt).
-- `app/gui/electron/main.ts`, `app/gui/electron/preload.ts`: Electron main (writes `job.json`, spawns `python -m chromainvert run`, parses stdout JSONL progress) and preload bridge.
+- `engine/src/chromainvert/cube.py`: `.cube` read/write, lattice reshape and validation. Red varies fastest in file order, matching FFmpeg `lut3d` expectations.
+- `engine/src/chromainvert/lut_module.py`: `DifferentiableLUT3D`, the learnable `(1, 3, N, N, N)` volume sampled with `F.grid_sample`.
+- `engine/src/chromainvert/color.py`: sRGB transfers, Oklab and CIE Lab conversion, DeltaE2000, Sony S-Log3 and Apple Log decode, `decode_input` for the `rec709`, `rec2020`, `slog3`, and `apple_log` profiles.
+- `engine/src/chromainvert/losses.py`: quantile and moment distribution matching, covariance matching, TV smoothness, identity prior, skin and shadow anchors, gamut penalty.
+- `engine/src/chromainvert/masks.py`: YCbCr skin heuristic and luminance shadow masks.
+- `engine/src/chromainvert/spline.py`: separable Catmull-Rom upsampling for coarse-to-fine lattices.
+- `engine/src/chromainvert/optimize.py`: Adam optimization loop with seeded pixel sampling, the `OptimizeConfig` weights, and the `deterministic` GPU mode flag.
+- `engine/src/chromainvert/cli.py`: `chromainvert run job.json`, `chromainvert predict image`, and `chromainvert benchmark` entry points; `run` accepts `reference_only` jobs with `predict_weights`.
+- `engine/src/chromainvert/lut_predictor.py`: single-image LUT predictor; 38 grade statistics plus a residual MLP around identity, 17 lattice spline-upsampled to 33. No checkpoint is shipped; checkpoints are never committed since they distill their training LUTs; see `data/README.md` and pass the file via `predict_weights` or `--weights`.
+- `engine/src/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000) plus the seeded random-RGB probe heldout gate and `style_probe_metrics` for LUT-to-LUT comparison on a random probe.
+- `engine/LICENSE`: Apache-2.0 copy of the repo root license so the `engine/` sdist and wheel carry license files per PEP 639 (`license-files`).
+- `app/README.md`: Windows run steps for the Electron GUI.
+- `app/gui/package.json`, `app/gui/vite.config.ts`, `app/gui/index.html`: Electron + React product GUI shell (Vite renderer, TypeScript, no Qt); unpacks `ffmpeg-static`/`ffprobe-static` via `asarUnpack` with a per-platform ffprobe prune.
+- `app/gui/electron/main.ts`, `app/gui/electron/preload.ts`: Electron main (writes `job.json`, resolves the engine via the pip-installed `chromainvert` on PATH then system Python, resolves ffmpeg/ffprobe via static npm binaries or PATH, first-run `env:check`/`env:setup` install via pip with progress, parses stdout JSONL progress) and preload bridge.
+- `app/gui/electron/ffprobe-static.d.ts`: types the untyped `ffprobe-static` export (`ffmpeg-static` ships its own).
 - `app/gui/src/App.tsx`, `app/gui/src/api.ts`, `app/gui/src/types.ts`: React one-screen GUI (inputs, reference-only predict mode, Match and Cancel, progress bar, status, log tail) on the preload bridge.
 - `scripts/ffmpeg_helpers.py`: FFmpeg Level 1 subprocess helpers (ffprobe parse, 16-bit PNG frame extraction with 8-bit fallback, lut3d preview, before/after, EngineRunner, error surfaces).
-- `docs/GUI_DECISION.md`: Electron + React product decision per issue #9 (Qt rejected for licensing, ImGui rejected as too developer focused, Win32 kept as fallback).
+- `docs/GUI_DECISION.md`: Electron + React product decision per issue #9 (Qt rejected for licensing, ImGui rejected as too developer focused).
 - `scripts/validate_cube.py`: FFmpeg `lut3d` acceptance check for exported cubes.
 - `scripts/premiere_validation.py`: FFmpeg `lut3d` vs Python `DifferentiableLUT3D` comparison with tetrahedral gap check and optional Premiere still scoring.
 - `scripts/run_benchmark.py`: runs the synthetic benchmark and writes `work/benchmark.json`.
@@ -46,14 +42,14 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `scripts/extract_frames.py`: extracts N frames from a video via FFmpeg.
 - `scripts/run_real_footage.py`: reusable driver for frame extraction, job creation, run, and validation with synthetic fallback.
 - `engine/tests/test_real_footage.py`: real-footage CLI and optimize smoke tests.
-- `engine/chromainvert/__main__.py`: enables `python -m chromainvert`.
+- `engine/src/chromainvert/__main__.py`: enables `python -m chromainvert`.
 - `assets/job.json.example`: tracked sample job for the real-footage CLI run.
 - `docs/CHROMAINVERT_HACKATHON_PLAN.md`: full technical plan and team guide.
 - `docs/ARCHITECTURE.md`: engine contract v2, backwards compatible with v1 (`job.json` schema, stdout JSONL protocol, `report.json` fields, color pipeline).
 - `docs/PREMIERE_VALIDATION.md`: Premiere Pro MCP validation procedure, thresholds, and SampleFootage steps.
 - `docs/PROGRESS.md`: timestamped build log, updated with every feature.
 - `engine/tests/test_*.py`: one test module per engine module above; update both together.
-- `.github/workflows/tests.yml`: CI workflow running `python -m pytest engine/tests -q` on Ubuntu plus an MSVC Release build of `app` on Windows, on push and pull request.
+- `.github/workflows/tests.yml`: CI workflow running `python -m pytest engine/tests -q` on Ubuntu on push and pull request.
 - `.github/workflows/gui.yml`: CI matrix on `windows-latest`, `macos-latest`, and `ubuntu-latest` running GUI `npm ci`, `typecheck`, `build`, and per-platform `electron-builder` packaging with artifact upload, on push and pull request.
 
 ## Build and run

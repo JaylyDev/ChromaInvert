@@ -1,4 +1,4 @@
-import type { DoneResult, FrameGrab, JobConfig, ProgressUpdate, VideoProbe } from "./types";
+import type { DoneResult, EnvStatus, FrameGrab, JobConfig, ProgressUpdate, SetupProgress, VideoProbe } from "../electron/types";
 
 export interface GuiBridge {
   runJob: (config: JobConfig) => Promise<DoneResult>;
@@ -11,8 +11,13 @@ export interface GuiBridge {
   grabFrame: (videoPath: string, timestamp: number, kind: string, outputDir: string) => Promise<FrameGrab>;
   pickOutputCube: (suggestedPath: string) => Promise<string | null>;
   pickWeights: () => Promise<string | null>;
+  checkEnv: () => Promise<EnvStatus>;
+  setupEnv: () => Promise<DoneResult>;
+  cancelSetup: () => Promise<void>;
   onProgress: (cb: (update: ProgressUpdate) => void) => void;
   onLog: (cb: (line: string) => void) => void;
+  onSetupProgress: (cb: (update: SetupProgress) => void) => void;
+  onSetupLog: (cb: (line: string) => void) => void;
 }
 
 declare global {

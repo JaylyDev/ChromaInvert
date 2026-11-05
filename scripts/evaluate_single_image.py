@@ -8,7 +8,7 @@ import imageio.v2 as imageio
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "engine"))
+sys.path.insert(0, str(ROOT / "engine" / "src"))
 
 from chromainvert.benchmark import apply_lut, mean_de00_full, random_rgb_probe, style_probe_metrics
 from chromainvert.cli import load_frames, predict_for_frames
