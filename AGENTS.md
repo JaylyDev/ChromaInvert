@@ -50,7 +50,8 @@ Python engine plus Electron GUI monorepo. Python source lives under `engine/src/
 - `docs/PROGRESS.md`: timestamped build log, updated with every feature.
 - `engine/tests/test_*.py`: one test module per engine module above; update both together.
 - `.github/workflows/tests.yml`: CI workflow running `python -m pytest engine/tests -q` on Ubuntu on push and pull request.
-- `.github/workflows/gui.yml`: CI matrix on `windows-latest`, `macos-latest`, and `ubuntu-latest` running GUI `npm ci`, `typecheck`, `build`, and per-platform `electron-builder` packaging with artifact upload, on push and pull request.
+- `.github/workflows/build.yml`: CI matrix on `windows-latest`, `macos-latest`, and `ubuntu-latest` running GUI `npm ci`, `typecheck`, `build`, and per-platform `electron-builder` packaging with artifact upload, on push and pull request.
+- `.github/workflows/release.yml`: tag (`v*`) pipeline; per-OS `npm ci`, `typecheck`, `build`, and `electron-builder` packaging, then one GitHub Release with all installers attached via `softprops/action-gh-release`.
 
 ## Build and run
 

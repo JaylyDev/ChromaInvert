@@ -54,7 +54,7 @@ JSON report defaults to `work/premiere_validation.json`. Exit code 0 means PASS,
 1. Extract a representative Rec.709 frame (range handling is explicit; the sample clips are `bt709` with `tv` range):
 
 ```
-ffmpeg -y -loglevel error -ss 1 -i "C:\Users\lokwa\Documents\SampleFootage\Rec709\A001_10290006_C101.mov" -frames:v 1 work/src_frame.png
+ffmpeg -y -loglevel error -ss 1 -i "$HOME\Documents\SampleFootage\Rec709\A001_10290006_C101.mov" -frames:v 1 work/src_frame.png
 ```
 
 2. Run validation with the candidate cube:

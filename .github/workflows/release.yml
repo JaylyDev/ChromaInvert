@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: app/gui
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/gui/package-lock.json
+      - name: Install GUI deps
+        run: npm ci
+      - name: Typecheck GUI
+        run: npm run typecheck
+      - name: Build GUI
+        run: npm run build
+      - name: Package GUI
+        run: npm run dist
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: chromainvert-${{ matrix.os }}
+          path: app/gui/release/*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-packages
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist-packages/**/*.exe
+            dist-packages/**/*.dmg
+            dist-packages/**/*.zip
+            dist-packages/**/*.AppImage
+            dist-packages/**/*.deb

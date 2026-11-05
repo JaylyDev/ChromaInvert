@@ -1,5 +1,88 @@
 # ChromaInvert Progress Log
 
+## 2026-11-05: Revert icon unpacking, mac and linux installers green again
+
+Completed:
+- Removed `assets/icon.png` plus `assets/icon.ico` from `asarUnpack` in `app/gui/package.json`: listing them in both `files` and `asarUnpack` made the macOS and Linux packagers crash with `EEXIST` hard-linking the same file into the asar and unpacked trees (Windows tolerated it). The runtime `windowIcon()` fallback already covers the packed layout by resolving the in-asar copy, and the real taskbar fix (rcedit embedding via the restored `signAndEditExecutable` default) is untouched.
+
+Verified:
+- `package.json` parses; `asarUnpack` now matches the `main` layout that passed macOS plus Linux CI.
+- Still to confirm: CI matrix green on the PR.
+
+## 2026-11-05: Full pipeline build proves the exe icon fix
+
+Completed:
+- Built the real `npm run dist` pipeline end to end in a sandbox without symlink rights by serving a symlink-free repack of the `winCodeSign` tools over a local mirror (`ELECTRON_BUILDER_BINARIES_MIRROR`); reverted the temporary local-only node_modules patch afterwards, so the repo is untouched by the workaround.
+- Verified on the pipeline-built exe: all 6 icon-group entries hash-match `assets/icon.ico`, and the extracted icon renders the dotted cube. The previous atom came from `signAndEditExecutable: false` skipping rcedit; with the flag removed the icon (plus version info) is embedded by the normal pipeline.
+- The fixed `ChromaInvert Setup 0.1.0.exe` and portable exe are in `app/gui/release/` (gitignored build output).
+
+Verified:
+- `npm run typecheck` and `npm run dist` pass; `pefile` icon-group hashes match `icon.ico`; viewed the extracted exe icon.
+- Still to confirm on the reporter's machine: uninstall the old `chromainvert-gui` copy plus pins, install the new `chromainvert` build, check taskbar and Start menu.
+
+## 2026-11-05: Exe icon root cause: signAndEditExecutable skipped rcedit
+
+Completed:
+- Found why the installed app showed the stock Electron atom in taskbar and Start: `win.signAndEditExecutable: false` in `app/gui/package.json` made `WinPackager.signApp` return early (`node_modules/app-builder-lib/out/winPackager.js`), so rcedit never embedded `assets/icon.ico` and the exe kept the stock Electron icon. Removed the flag (signing still skips gracefully with no cert, as the build log already shows).
+- Added `app.setAppUserModelId("com.chromainvert.gui")` before `app.whenReady()` in `electron/main.ts` so Windows taskbar grouping keys off our app identity.
+- Proved the chain with pefile on the packaged exe: before, one icon group with 4 stock entries (no bytes matching `icon.ico`); after running the cached `rcedit-x64.exe --set-icon assets/icon.ico`, 6 entries whose hashes all match `icon.ico`, and the extracted icon renders the dotted cube.
+
+Verified:
+- `npm run typecheck` passes. Full `npm run dist` now reaches the winCodeSign stage (previously skipped), which needs a one-time tools extraction; sandboxes without symlink privilege fail there, so run packaging once elevated or with Developer Mode, after which the tools cache is reused.
+- Still to confirm on the reporter's machine: uninstall the old `chromainvert-gui` copy, `npm run dist`, install the `chromainvert` build, check taskbar and Start icons.
+
+## 2026-11-05: GUI package renamed to chromainvert
+
+Completed:
+- Renamed the GUI npm package `chromainvert-gui` to `chromainvert` (`package.json` plus the root lockfile stanzas, synced with `npm install --package-lock-only`). The oneClick NSIS install folder follows the package name, so fresh installs now land in `%LOCALAPPDATA%\Programs\chromainvert` instead of `chromainvert-gui`.
+- Renamed the CI artifact labels in `build.yml` and `release.yml` to `chromainvert-<os>`. Left `productName` (`ChromaInvert`, installer and shortcut names), `appId` (`com.chromainvert.gui`, upgrade continuity), and targets untouched.
+- Side benefit for the reported taskbar atom: the new exe path is a fresh Windows icon-cache key with no stale default-Electron art, once the old install plus its pins are removed.
+
+Verified:
+- `npm run typecheck` and `npm run dist` pass; the build log shows `__uninstaller-nsis-chromainvert.exe`, and the new Setup exe contains no `chromainvert-gui` string.
+- Still to confirm on the reporter's machine after uninstalling the old folder, unpinning, and reinstalling: taskbar plus Start menu show the custom icon.
+
+## 2026-11-05: Window icon fallback chain plus startup diagnostic
+
+Completed:
+- `electron/main.ts` now resolves the window icon through an unpacked-assets-first fallback chain (unpacked copy, then the in-asar copy) and logs the winner (`window icon: <path>`) or `window icon: none found, using default` to stdout, so a missing file can no longer silently fall back to the default atom icon.
+- Rebuilt Setup plus portable installers carry the change.
+
+Verified:
+- `npm run typecheck` and `npm run dist` pass; the compiled `dist/electron/main.js` contains the fallback chain and log lines.
+- Still to confirm on the reporter's machine: run the installed app from a terminal with `--enable-logging` and report the `window icon:` line plus whether the taskbar still shows the atom.
+
+## 2026-11-05: C++ references removed from living docs
+
+Completed:
+- Removed the `C++` string from every tracked file except `docs/PROGRESS.md` (kept as the historical log): `app/README.md` no longer describes the deleted hosts, `app/gui/README.md` no longer points at them for the `job.json` contract, `docs/GUI_DECISION.md` drops the deleted-host build steps and paths in favor of the Electron package flow, and `docs/CHROMAINVERT_HACKATHON_PLAN.md` keeps its planning structure with neutral wording.
+- Rewrote the stale Win32 plus CMake build instructions in `docs/GUI_DECISION.md` (the code was deleted with the hosts) to the current `cd app/gui && npm install && npm run dev` flow.
+
+Verified:
+- Case-sensitive grep for `C++` matches only `docs/PROGRESS.md` lines.
+
+## 2026-11-05: Packaged window icon fix
+
+Completed:
+- Fixed the installed app falling back to the default Electron atom icon (easily mistaken for the React logo): `electron/main.ts` now resolves the window icon from the unpacked assets folder when packaged (`process.resourcesPath/app.asar.unpacked/assets/icon.png`) and from the project folder in dev, and loads the renderer via `app.getAppPath()/dist/index.html` instead of a relative `__dirname` climb.
+- Declared `assets/icon.png` plus `assets/icon.ico` in `asarUnpack` and set explicit `nsis.installerIcon` plus `uninstallerIcon` in `app/gui/package.json`, so the Setup exe, uninstaller, and running window all carry the ChromaInvert icon.
+
+Verified:
+- `npm run typecheck` and `npm run build` pass in `app/gui`.
+- `npm run dist:dir` packs; `app.asar.unpacked/assets/` carries `icon.png` plus `icon.ico`, and the compiled `dist/electron/main.js` uses the unpacked path when packaged.
+
+## 2026-11-05: GUI install releases from v* tags (rebuilt on main)
+
+Completed:
+- Added `.github/workflows/release.yml`: pushed tags matching `v*` run per-OS `npm ci`, `typecheck`, `build`, and `electron-builder` packaging (`npm run dist`), then a `publish` job downloads all three OS artifacts and attaches the installers (`.exe`, `.dmg`, `.zip`, `.AppImage`, `.deb`) to one GitHub Release via `softprops/action-gh-release@v3` with generated notes.
+- Fixed the stale `.github/workflows/gui.yml` reference in `AGENTS.md` to `build.yml` and recorded `release.yml` under Parts of the project.
+- Added a Download and use the GUI section to root `README.md` and `app/gui/README.md`: Releases page link, per-OS install notes (Windows setup plus portable with unsigned SmartScreen note, macOS dmg with Gatekeeper note, Linux AppImage plus deb), first-run Environment Install engine step (Python 3.10 plus PyPI, FFmpeg ships inside), and the basic Match workflow.
+
+Verified:
+- Workflow YAML parses with `yaml.safe_load` (tag filter `v*`, jobs `build` plus `publish`).
+- `npm run typecheck` and `npm run build` pass in `app/gui`.
+- `python -m pytest engine/tests -q`: 130 passed, 1 skipped.
+
 ## 2026-11-05: PyInstaller bundle removed, engine installs via pip
 
 Completed:

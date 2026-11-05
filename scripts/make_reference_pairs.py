@@ -55,7 +55,7 @@ def grade_frame_working(src: Path, truth: CubeLut, dst: Path, profile: str) -> N
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build graded eval pairs from footage and LUTs")
-    parser.add_argument("--footage-root", default=r"C:\Users\lokwa\Documents\SampleFootage")
+    parser.add_argument("--footage-root", default=str(Path.home() / "Documents" / "SampleFootage"))
     parser.add_argument("--lut", action="append", default=[], help="repeatable .cube path")
     parser.add_argument("--out", default="work/pairs")
     parser.add_argument("--frames-per-clip", type=int, default=3)

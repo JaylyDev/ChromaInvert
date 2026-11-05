@@ -4,7 +4,7 @@ No third party assets are committed yet. Every file added under `assets/` must b
 
 ## Demo footage (local only, not committed)
 
-Local sample pack at `C:\Users\lokwa\Documents\SampleFootage`, kept out of git.
+Local sample pack at `$HOME\Documents\SampleFootage`, kept out of git.
 Used by `scripts/run_demo.py` and `docs/DEMO_SCRIPT.md` for the dry run.
 
 - `Rec709/A001_10290006_C101.mov`: Rec.709 H.265 clip, 3840x2160, about 9.4 s.

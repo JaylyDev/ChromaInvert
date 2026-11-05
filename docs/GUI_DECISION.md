@@ -1,24 +1,24 @@
 # GUI Framework Decision
 
 Date: 2026-10-29
-Status: updated 2026-11-05: Electron + React UI, C++ hosts removed (bundled FFmpeg supersedes the sidecar)
+Status: updated 2026-11-05: Electron + React UI, old native hosts removed (bundled FFmpeg supersedes the sidecar)
 Related: Section 8.1 of docs/CHROMAINVERT_HACKATHON_PLAN.md, docs/ARCHITECTURE.md, issue #9
 
-## Decision 2026-11-05 (current): Electron + React UI, no C++ hosts
+## Decision 2026-11-05 (current): Electron + React UI, no native hosts
 
-The Win32 desktop fallback and the `chromainvert-host` console driver were
+The old desktop fallback and console driver were
 deleted: the GUI ships its own FFmpeg binaries via `ffmpeg-static` and
-`ffprobe-static`, so the C++ FFmpeg sidecar has no role left. The Python
+`ffprobe-static`, so the old FFmpeg sidecar has no role left. The Python
 mirror of the old helpers lives in `scripts/ffmpeg_helpers.py`. Earlier
 decision history below is kept as a record.
 
-## Decision 2026-11-01 (superseded): Electron + React UI, C++ helpers retained
+## Decision 2026-11-01 (superseded): Electron + React UI, native helpers retained
 
-Per the issue #9 comment, the product UI is Electron + React. C++ stays for FFmpeg and math helpers (`app/src/job_runner.*`, `app/src/ffmpeg.*`, `app/src/Preview.*`, `app/src/host_main.cpp`). The new GUI lives in `app/gui/` and drives the same `job.json` contract (ARCHITECTURE.md v2) by spawning `python -m chromainvert run` or `chromainvert-host`, then parsing stdout JSONL progress.
+Per the issue #9 comment, the product UI is Electron + React. Native helpers covered FFmpeg and math at the time. The new GUI lives in `app/gui/` and drives the same `job.json` contract (ARCHITECTURE.md v2) by spawning `python -m chromainvert run`, then parsing stdout JSONL progress.
 
-- Qt 6 C++ framework: rejected. Mixed LGPL, GPLv3, and commercial licensing makes this project risky.
+- Qt 6 framework: rejected. Mixed LGPL, GPLv3, and commercial licensing makes this project risky.
 - Dear ImGui: rejected for the product UI. It looks too developer focused for a consumer product. May be revisited only for internal debug views.
-- Native Win32 host (`app/src/MainWindow.*`, `app/src/JobRunner.*`, `app/src/main.cpp`): legacy fallback. It still builds, but it is not the product path. No new Win32 or Qt widgets.
+- Old native desktop fallback: removed 2026-11-05 with the console driver. It proved file pickers, Match and Cancel, progress from engine JSONL, and the log pane. No replacement native widgets are planned.
 
 ## Options evaluated (history)
 
@@ -41,7 +41,7 @@ Pros:
 - Single source vendor, no MOC, tiny build.
 
 Cons:
-- File dialogs and video preview are DIY; need native dialogs via tinyfiledialogs or manual Win32.
+- File dialogs and video preview are DIY; need native dialogs via tinyfiledialogs or manual platform dialogs.
 - Looks like a debug tool, not a product; extra work to polish.
 - Still needs GLFW or SDL via vcpkg or vendored source, so similar bootstrapping as Qt.
 
@@ -53,30 +53,22 @@ Cons: weaker demo, no scrub or wipe story, judges expect a desktop app.
 
 Verdict: kept as fallback; the console host for issue #3 provides this.
 
-### Legacy note: native Win32 host (kept, not the product path)
+### Legacy note: native desktop fallback (removed 2026-11-05)
 
-The earlier pragmatic choice for issue #9 was a native Win32 host that satisfies the one-screen spec without external dependencies:
-
-- Why it existed: builds with only the Windows SDK and C++17. Works with MSVC (vcvars64) and MinGW-w64 GCC 13+ already on the machine. No vcpkg, no Qt download, cmake builds in seconds.
-- What it proves: file pickers, Match and Cancel buttons, progress bar driven by engine JSONL, Strength plus LUT size plus device controls, log pane, and a JobRunner that writes `job.json` (contract v1) and spawns `chromainvert run`. Preview with wipe slider, scopes, and a device badge are follow-up issues, not part of this skeleton.
-- Product path: the Electron + React GUI in `app/gui/` reuses the same `job.json` contract. No QMainWindow follow-up; the `CHROMAINVERT_USE_QT` switch will not be added.
-
-If the Electron GUI is unavailable, the Win32 host remains a shippable fallback artifact.
+The earlier pragmatic choice for issue #9 was a native desktop fallback that satisfied the one-screen spec without extra dependencies. It proved file pickers, Match and Cancel buttons, a progress bar driven by engine JSONL, Strength plus LUT size plus device controls, and a log pane. It was deleted with the console driver once the GUI bundled FFmpeg; the Electron GUI in `app/gui/` is the only product path.
 
 ## Consequences
 
-- Build: `cmake -B build -S app` then `cmake --build build` produces `build/Release/ChromaInvert.exe`.
-- Runtime deps: Python with `chromainvert` installed on PATH. Missing tools show a plain language dialog and a log line, per Section 8.4. FFmpeg and ffprobe are used by the validation scripts; host-driven preview arrives with #10.
+- Package: `cd app/gui && npm run dist` produces the per-OS installer in `release/` (Windows setup plus portable, macOS dmg plus zip, Linux AppImage plus deb).
+- Runtime deps: system Python with `chromainvert` installed via pip. Missing engine shows the Environment setup panel with an Install button, per Section 8.4. FFmpeg and ffprobe ship inside the app; in-app preview arrives with #10.
 - No embedded Python: subprocess plus files, per Section 4.1. The log pane shows the engine JSONL tail.
-- Next issues: #10 (FFmpeg decode and preview link) and #11 (scopes) build on this host without framework churn.
+- Next issues: #10 (FFmpeg decode and preview link) and #11 (scopes) build on this GUI without framework churn.
 
-## Build steps for Windows (documented here and in app/README.md)
+## Build steps (documented here and in app/README.md)
 
 Prerequisites:
-- CMake 3.20 or newer
-- MSVC 2022 (run `vcvars64.bat`) or MinGW-w64 GCC 13+
-- FFmpeg on PATH (winget `Gyan.FFmpeg`)
-- Python 3.10+ with `pip install -e ./engine`
+- Node 22
+- Python 3.10 or newer (the app installs `chromainvert` from PyPI on first run)
 
 Electron GUI (product path, in `app/gui/`):
 ```
@@ -85,19 +77,10 @@ npm install
 npm run dev
 ```
 
-Win32 host (legacy fallback):
-```
-cmake -B build -S app
-cmake --build build --config Release
-.\build\Release\ChromaInvert.exe   (MSVC multi-config)
-.\build\ChromaInvert.exe           (MinGW single-config)
-```
-
 No Qt port. Qt was rejected per issue #9 for licensing risk.
 
-The Electron GUI spawns the same engine entry points as the C++ hosts and parses the same stdout JSONL protocol.
+The Electron GUI spawns the same engine entry points and parses the same stdout JSONL protocol.
 
 Notes:
-- The app opts into system DPI awareness at startup so the fixed-pixel layout scales as a unit; per-monitor layout scaling is a follow-up. No external manifest needed.
-- JobRunner writes `job.json` and `report.json` next to the chosen output `.cube` path; all job paths may be absolute (relative typed paths are canonicalized first).
+- Electron main writes `job.json` and `report.json` next to the chosen output `.cube` path; all job paths may be absolute (relative typed paths are canonicalized first).
 - Progress is JSONL on stdout; cancellation kills the child process.
