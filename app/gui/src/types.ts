@@ -9,6 +9,7 @@ export interface JobConfig {
   weightTv: number;
   weightShadow: number;
   weightPaired: number;
+  premiereExport: boolean;
   strength: number;
   lutSize: number;
   coarseSize: number;

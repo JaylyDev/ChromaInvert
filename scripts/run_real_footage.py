@@ -99,6 +99,11 @@ def main() -> int:
     parser.add_argument("--device", default="auto")
     parser.add_argument("--strength", type=float, default=1.0)
     parser.add_argument("--num-frames", type=int, default=3)
+    parser.add_argument("--input-profile", default="rec709", help="source profile: rec709, rec2020, or apple_log")
+    parser.add_argument("--reference-profile", default=None, help="reference profile; engine default is rec709 for log sources")
+    parser.add_argument("--weight-paired", type=float, default=None, help="set when the reference is the same footage after grading")
+    parser.add_argument("--weight-tv", type=float, default=None)
+    parser.add_argument("--weight-shadow", type=float, default=None)
     args = parser.parse_args()
 
     work_dir = args.work_dir.resolve()
@@ -136,7 +141,7 @@ def main() -> int:
         "contract_version": 1,
         "source_frames": [p.relative_to(work_dir).as_posix() for p in source_files],
         "reference_frames": [p.relative_to(work_dir).as_posix() for p in reference_files],
-        "input_profile": "rec709",
+        "input_profile": args.input_profile,
         "coarse_size": args.coarse_size,
         "lut_size": args.lut_size,
         "iterations": args.iterations,
@@ -147,6 +152,14 @@ def main() -> int:
         "output_cube": output_cube.as_posix(),
         "report_json": (work_dir / "report.json").as_posix(),
     }
+    # Optional keys are omitted when unset so the engine defaults stay authoritative.
+    optional = {
+        "reference_profile": args.reference_profile,
+        "weight_paired": args.weight_paired,
+        "weight_tv": args.weight_tv,
+        "weight_shadow": args.weight_shadow,
+    }
+    job.update({key: value for key, value in optional.items() if value is not None})
     job_path = work_dir / "job.json"
     job_path.write_text(json.dumps(job, indent=2))
 

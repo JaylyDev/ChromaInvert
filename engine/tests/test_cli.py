@@ -250,3 +250,38 @@ def test_run_accepts_apple_log(tmp_path):
     assert (tmp_path / "out.cube").exists()
     report = json.loads((tmp_path / "report.json").read_text())
     assert report["input_profile"] == "apple_log"
+
+
+def test_bake_export_lut_premiere_identity_inverts_premiere_curve():
+    from chromainvert.color import _PREMIERE_APPLE_LOG_CURVE
+
+    baked = bake_export_lut(CubeLut(size=17, lattice=identity_lattice(17)), "apple_log", "rec709", "premiere")
+    nodes = identity_lattice(17).astype(np.float64)
+    expected = np.interp(nodes, _PREMIERE_APPLE_LOG_CURVE, np.linspace(0.0, 1.0, _PREMIERE_APPLE_LOG_CURVE.size))
+    np.testing.assert_allclose(baked.lattice, expected, atol=1e-4)
+
+
+def test_run_premiere_export_target_reported(tmp_path):
+    import argparse
+
+    args = argparse.Namespace(job=str(write_job(tmp_path, input_profile="apple_log", export_target="premiere")))
+    assert cmd_run(args) == 0
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert report["export_target"] == "premiere"
+
+
+def test_run_rejects_premiere_export_target_for_non_apple_log(tmp_path):
+    import argparse
+
+    args = argparse.Namespace(job=str(write_job(tmp_path, input_profile="rec709", export_target="premiere")))
+    with pytest.raises(ValueError):
+        cmd_run(args)
+    assert not (tmp_path / "out.cube").exists()
+
+
+def test_run_rejects_unknown_export_target(tmp_path):
+    import argparse
+
+    args = argparse.Namespace(job=str(write_job(tmp_path, input_profile="apple_log", export_target="resolve")))
+    with pytest.raises(ValueError):
+        cmd_run(args)

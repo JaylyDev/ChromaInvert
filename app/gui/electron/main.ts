@@ -24,6 +24,7 @@ interface JobFile {
   weight_tv: number;
   weight_shadow: number;
   weight_paired: number;
+  export_target: string;
   coarse_size: number;
   lut_size: number;
   iterations: number;
@@ -431,6 +432,7 @@ ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promi
       weight_tv: weightTv,
       weight_shadow: weightShadow,
       weight_paired: weightPaired,
+      export_target: payload.premiereExport && profile === "apple_log" ? "premiere" : "log",
       coarse_size: payload.coarseSize,
       lut_size: payload.lutSize,
       iterations: payload.iterations,

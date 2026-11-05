@@ -219,6 +219,20 @@ def decode_apple_log(code: NDArray[np.floating]) -> NDArray[np.float64]:
     return np.where(y < 0.0, _APPLE_R0, np.where(y < _APPLE_PT, quad, log))
 
 
+# Premiere Pro color-managed Apple Log display output sampled against the sRGB-encoded apple_log decode
+# on a 17-point grid (Premiere 2025, Rec.709 sequence, default color management).
+_PREMIERE_APPLE_LOG_CURVE = np.array(
+    [0.09, 0.094, 0.133, 0.173, 0.227, 0.275, 0.325, 0.373, 0.427, 0.478, 0.525, 0.569, 0.612, 0.659, 0.69, 0.718, 0.784]
+)
+
+
+def premiere_apple_log_to_working(display: NDArray[np.floating]) -> NDArray[np.float64]:
+    """Inverts what Premiere feeds Lumetri for an Apple Log clip back into the linear working space."""
+    grid = np.linspace(0.0, 1.0, _PREMIERE_APPLE_LOG_CURVE.size)
+    encoded = np.interp(np.asarray(display, dtype=np.float64), _PREMIERE_APPLE_LOG_CURVE, grid)
+    return srgb_to_linear(encoded)
+
+
 def rec2020_to_rec709_linear(rgb: NDArray[np.floating]) -> NDArray[np.float64]:
     return np.asarray(rgb, dtype=np.float64) @ _BT2020_TO_SRGB_LINEAR.T
 

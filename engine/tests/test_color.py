@@ -217,3 +217,12 @@ def test_decode_input_rec2020_known_values():
         [[[0.3352295, 0.01076178, 0.00399818]]],
         rtol=1e-6,
     )
+
+
+def test_premiere_apple_log_to_working_inverts_curve():
+    from chromainvert.color import _PREMIERE_APPLE_LOG_CURVE, premiere_apple_log_to_working
+
+    grid = np.linspace(0.0, 1.0, _PREMIERE_APPLE_LOG_CURVE.size)
+    np.testing.assert_allclose(premiere_apple_log_to_working(_PREMIERE_APPLE_LOG_CURVE), srgb_to_linear(grid), atol=1e-9)
+    assert premiere_apple_log_to_working(np.array([0.0]))[0] == 0.0
+    assert premiere_apple_log_to_working(np.array([1.0]))[0] == 1.0

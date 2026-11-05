@@ -162,6 +162,8 @@ export default function App(): JSX.Element {
   const [weightTv, setWeightTv] = useState<number>(0.1);
   const [weightShadow, setWeightShadow] = useState<number>(0.25);
   const [alignedPairs, setAlignedPairs] = useState<boolean>(false);
+  const [premiereStills, setPremiereStills] = useState<boolean>(false);
+  const [premiereExport, setPremiereExport] = useState<boolean>(true);
   const [strength, setStrength] = useState<number>(1.0);
   const [lutSize, setLutSize] = useState<number>(33);
   const [coarseSize, setCoarseSize] = useState<number>(17);
@@ -269,6 +271,11 @@ export default function App(): JSX.Element {
     if (referenceFrames.length === 0) {
       found.push("Add at least one reference frame.");
     }
+    if (premiereStills && sourceFrames.some((p) => /video_frames[\\/]source_/.test(p))) {
+      found.push(
+        "Premiere stills needs source frames exported from Premiere; frames captured from a video here are raw footage. Untick Premiere stills and set the input profile to apple_log for Apple Log footage."
+      );
+    }
     if (outputCube.trim() === "") {
       found.push("Pick an output .cube path.");
     } else if (!outputCube.trim().toLowerCase().endsWith(".cube")) {
@@ -317,6 +324,24 @@ export default function App(): JSX.Element {
     return found;
   }
 
+  // Paired fits need a longer, less regularized run to reach the grade; measured on Premiere stills.
+  function applyPairedPreset(on: boolean): void {
+    setAlignedPairs(on);
+    setIterations(on ? 1500 : 400);
+    setFineIterations(on ? 200 : 30);
+    setWeightTv(on ? 0.03 : 0.1);
+    setWeightShadow(on ? 0.05 : 0.25);
+  }
+
+  function applyPremiereStills(on: boolean): void {
+    setPremiereStills(on);
+    if (on) {
+      setInputProfile("rec709");
+      setReferenceProfile("auto");
+      applyPairedPreset(true);
+    }
+  }
+
   function toJobConfig(): JobConfig {
     return {
       sourceFrames,
@@ -328,7 +353,8 @@ export default function App(): JSX.Element {
       referenceProfile,
       weightTv,
       weightShadow,
-      weightPaired: alignedPairs ? 10 : 0,
+      weightPaired: alignedPairs ? 50 : 0,
+      premiereExport: inputProfile === "apple_log" && premiereExport,
       strength,
       lutSize,
       coarseSize,
@@ -933,12 +959,30 @@ export default function App(): JSX.Element {
                 </div>
               </div>
             )}
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={premiereStills}
+                disabled={running || referenceOnly}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => applyPremiereStills(e.target.checked)}
+              />
+              Premiere stills: source frames are exported from Premiere with no LUT and reference frames
+              are the same times with your grade. The cube goes in Lumetri Input LUT. For raw Apple Log
+              video captured here, leave this off and use apple_log instead.
+            </label>
+            {premiereStills && (
+              <p className="hint">
+                Premiere color-manages log clips before Lumetri, so the cube is trained on what Premiere
+                renders: rec709 profile and same-frame pairs are set for you. Use File &gt; Export &gt;
+                Frame on the ungraded clip and on the graded clip at matching times.
+              </p>
+            )}
             <div className="grid2">
               <label className="field">
                 <span>Input profile (source)</span>
                 <select
                   value={inputProfile}
-                  disabled={running}
+                  disabled={running || premiereStills}
                   onChange={(e: ChangeEvent<HTMLSelectElement>) => setInputProfile(e.target.value)}
                 >
                   <option value="rec709">rec709</option>
@@ -952,7 +996,7 @@ export default function App(): JSX.Element {
                 <span>Reference profile (graded)</span>
                 <select
                   value={referenceProfile}
-                  disabled={running}
+                  disabled={running || premiereStills}
                   onChange={(e: ChangeEvent<HTMLSelectElement>) => setReferenceProfile(e.target.value)}
                 >
                   <option value="auto">Auto ({defaultReferenceProfile(inputProfile)})</option>
@@ -964,11 +1008,25 @@ export default function App(): JSX.Element {
                 </select>
               </label>
             </div>
+            {inputProfile === "apple_log" && (
+              <label className="field">
+                <span>Apply the cube in</span>
+                <select
+                  value={premiereExport ? "premiere" : "log"}
+                  disabled={running}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setPremiereExport(e.target.value === "premiere")}
+                >
+                  <option value="premiere">Premiere (clip color space Apple Log, Lumetri Input LUT)</option>
+                  <option value="log">FFmpeg or Resolve (raw Apple Log codes)</option>
+                </select>
+              </label>
+            )}
             {isLogProfile(inputProfile) && (
               <p className="hint">
-                Apple Log and S-Log3 export a host-domain cube: it applies directly to the log footage in
-                Premiere or FFmpeg with no extra conversion. Graded references stay display-referred, so keep
-                the reference profile on rec709.
+                {inputProfile === "apple_log" && premiereExport
+                  ? "The cube expects what Premiere feeds Lumetri after its Apple Log color management, so leave the clip on Apple Log and load the cube as the Lumetri Input LUT."
+                  : "The cube applies directly to raw log footage in FFmpeg or Resolve."}{" "}
+                Graded references stay display-referred, so keep the reference profile on rec709.
               </p>
             )}
             {isLogProfile(resolvedReference) && (
@@ -982,11 +1040,12 @@ export default function App(): JSX.Element {
               <input
                 type="checkbox"
                 checked={alignedPairs}
-                disabled={running}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setAlignedPairs(e.target.checked)}
+                disabled={running || premiereStills}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => applyPairedPreset(e.target.checked)}
               />
               Same-frame pairs: source and reference are the same frames before and after grading (for
-              example Capture both at matched time). Restores saturation on Apple Log grades.
+              example Capture both at matched time). Fits the grade per pixel with a longer run (1500 plus
+              200 iterations).
             </label>
             <div className="grid2">
               <label className="field">
