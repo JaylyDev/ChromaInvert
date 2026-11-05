@@ -1,5 +1,12 @@
 # ChromaInvert Progress Log
 
+## 2026-11-05: Remove C++ hosts (bundled FFmpeg supersedes the sidecar)
+
+Completed:
+- Deleted `app/CMakeLists.txt` and all of `app/src/` (Win32 desktop host, `chromainvert-host` console driver, `ffmpeg`/`Preview` modules): the GUI ships FFmpeg via static npm binaries, so the C++ sidecar has no role left. The Python mirror of the old helpers lives in `scripts/ffmpeg_helpers.py`.
+- Rewrote `app/README.md` as a GUI-only doc; dropped the `build-windows` CMake job from `.github/workflows/build.yml`.
+- Updated `README.md` layout, `docs/ARCHITECTURE.md` process model, and `AGENTS.md` (monorepo intro, Parts list, `tests.yml` description); recorded the superseding decision in `docs/GUI_DECISION.md`. Planning history in `docs/CHROMAINVERT_HACKATHON_PLAN.md` and older `docs/PROGRESS.md` entries are kept as a record.
+
 ## 2026-11-04: GUI uses the host-domain Apple Log path
 
 Completed:

@@ -7,7 +7,7 @@ Built using Meta's proprietary and open weights models for the Meta Global AI De
 ## Layout
 
 - `engine/`: Python color engine (differentiable LUT, losses, `.cube` I/O)
-- `app/`: C++ desktop host (FFmpeg pipeline, preview UI)
+- `app/`: Electron + React product GUI (video import, Match, progress, `.cube` export)
 - `assets/`: test footage and reference frames, sources noted in `assets/SOURCES.md`
 - `scripts/`: validation and benchmark helpers
 - `docs/`: architecture and planning documents
