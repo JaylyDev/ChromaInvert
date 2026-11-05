@@ -3,6 +3,8 @@ import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve as resolvePath } from "node:path";
+import ffmpegStaticPath from "ffmpeg-static";
+import { path as ffprobeStaticPath } from "ffprobe-static";
 import type { FileFilter, IpcMainInvokeEvent } from "electron";
 import type { DoneResult, FrameGrab, JobConfig, ProgressUpdate, VideoProbe } from "../src/types";
 
@@ -114,24 +116,29 @@ function probeVideoPath(videoPath: string): Promise<VideoProbe> {
   if (target === "") {
     return Promise.resolve(emptyProbe(videoPath, "Pick a video file first."));
   }
-  const probed = spawnSync("ffprobe", [
-    "-v", "error",
-    "-select_streams", "v:0",
-    "-show_entries", "stream=codec_name,width,height,avg_frame_rate",
-    "-show_entries", "format=duration",
-    "-of", "json",
-    target
-  ], { encoding: "utf8" });
-  if (probed.status !== 0) {
-    const detail = String(probed.stderr ?? probed.error ?? "ffprobe failed").trim().slice(-300);
-    return Promise.resolve(emptyProbe(target, detail === "" ? "ffprobe failed." : detail));
-  }
-  return Promise.resolve(String(probed.stdout)).then(
-    (text: string): unknown => JSON.parse(text)
-  ).then(
-    (value: unknown): VideoProbe => buildProbe(target, value),
-    (): VideoProbe => emptyProbe(target, "ffprobe returned unreadable JSON.")
-  );
+  return resolveTool(ToolKind.Ffprobe).then((tool): Promise<VideoProbe> => {
+    if (tool === null) {
+      return Promise.resolve(emptyProbe(target, missingToolMessage(ToolKind.Ffprobe)));
+    }
+    const probed = spawnSync(tool.command, [
+      "-v", "error",
+      "-select_streams", "v:0",
+      "-show_entries", "stream=codec_name,width,height,avg_frame_rate",
+      "-show_entries", "format=duration",
+      "-of", "json",
+      target
+    ], { encoding: "utf8" });
+    if (probed.status !== 0) {
+      const detail = String(probed.stderr ?? probed.error ?? "ffprobe failed").trim().slice(-300);
+      return Promise.resolve(emptyProbe(target, detail === "" ? "ffprobe failed." : detail));
+    }
+    return Promise.resolve(String(probed.stdout)).then(
+      (text: string): unknown => JSON.parse(text)
+    ).then(
+      (value: unknown): VideoProbe => buildProbe(target, value),
+      (): VideoProbe => emptyProbe(target, "ffprobe returned unreadable JSON.")
+    );
+  });
 }
 
 function grabFrameAt(videoPath: string, timestamp: number, kind: string, outputDir: string): Promise<FrameGrab> {
@@ -141,37 +148,42 @@ function grabFrameAt(videoPath: string, timestamp: number, kind: string, outputD
   if (target === "") {
     return Promise.resolve({ framePath: "", timestamp: time, error: "Pick a video file first." });
   }
-  const baseDir = outputDir.trim() === "" ? "work" : outputDir.trim();
-  const workdirAbs = resolvePath(process.cwd(), baseDir);
-  const stampText = time.toFixed(2).replace(".", "p");
-  const fileName = safeKind + "_" + stampText + "s_" + String(Date.now() % 100000) + ".png";
-  const absOut = join(workdirAbs, "video_frames", fileName);
-  return mkdir(dirname(absOut), { recursive: true }).then(
-    (): Promise<FrameGrab> =>
-      new Promise<FrameGrab>((resolve) => {
-        const child: ChildProcess = spawn("ffmpeg", [
-          "-y", "-ss", String(time), "-i", target,
-          "-frames:v", "1", "-pix_fmt", "rgb24", absOut
-        ], { cwd: process.cwd() });
-        let detail = "";
-        child.stderr?.on("data", (chunk: Buffer) => {
-          detail = (detail + chunk.toString("utf8")).slice(-500);
-        });
-        child.on("error", () => {
-          resolve({ framePath: "", timestamp: time, error: "ffmpeg was not found on PATH." });
-        });
-        child.on("close", (code: number | null) => {
-          if (code !== 0) {
-            resolve({ framePath: "", timestamp: time, error: detail === "" ? "ffmpeg frame grab failed." : detail });
-            return;
-          }
-          stat(absOut).then(
-            () => resolve({ framePath: absOut, timestamp: time, error: "" }),
-            () => resolve({ framePath: "", timestamp: time, error: "ffmpeg produced no output file." })
-          );
-        });
-      })
-  );
+  return resolveTool(ToolKind.Ffmpeg).then((tool): Promise<FrameGrab> => {
+    if (tool === null) {
+      return Promise.resolve({ framePath: "", timestamp: time, error: missingToolMessage(ToolKind.Ffmpeg) });
+    }
+    const baseDir = outputDir.trim() === "" ? "work" : outputDir.trim();
+    const workdirAbs = resolvePath(process.cwd(), baseDir);
+    const stampText = time.toFixed(2).replace(".", "p");
+    const fileName = safeKind + "_" + stampText + "s_" + String(Date.now() % 100000) + ".png";
+    const absOut = join(workdirAbs, "video_frames", fileName);
+    return mkdir(dirname(absOut), { recursive: true }).then(
+      (): Promise<FrameGrab> =>
+        new Promise<FrameGrab>((resolve) => {
+          const child: ChildProcess = spawn(tool.command, [
+            "-y", "-ss", String(time), "-i", target,
+            "-frames:v", "1", "-pix_fmt", "rgb24", absOut
+          ], { cwd: process.cwd() });
+          let detail = "";
+          child.stderr?.on("data", (chunk: Buffer) => {
+            detail = (detail + chunk.toString("utf8")).slice(-500);
+          });
+          child.on("error", () => {
+            resolve({ framePath: "", timestamp: time, error: tool.command + " failed to start from " + tool.source + "." });
+          });
+          child.on("close", (code: number | null) => {
+            if (code !== 0) {
+              resolve({ framePath: "", timestamp: time, error: detail === "" ? "ffmpeg frame grab failed." : detail });
+              return;
+            }
+            stat(absOut).then(
+              () => resolve({ framePath: absOut, timestamp: time, error: "" }),
+              () => resolve({ framePath: "", timestamp: time, error: "ffmpeg produced no output file." })
+            );
+          });
+        })
+    );
+  });
 }
 
 function isProgressLine(value: unknown): value is ProgressLine {
@@ -222,6 +234,107 @@ function isLogProfile(profile: string): boolean {
 
 function contractVersionFor(profile: string): number {
   return profile.indexOf("slog3") === 0 ? 2 : 1;
+}
+
+enum ToolKind {
+  Ffmpeg,
+  Ffprobe,
+  Engine
+}
+
+interface ToolResolution {
+  command: string;
+  prefixArgs: string[];
+  source: string;
+}
+
+function engineExeName(): string {
+  return process.platform === "win32" ? "chromainvert-engine.exe" : "chromainvert-engine";
+}
+
+function engineBinPlatform(): string {
+  if (process.platform === "win32") {
+    return "win";
+  }
+  if (process.platform === "darwin") {
+    return "mac";
+  }
+  return "linux";
+}
+
+function bundledEnginePath(): string {
+  if (app.isPackaged) {
+    return join(process.resourcesPath, "engine-bin", engineExeName());
+  }
+  return join(__dirname, "..", "engine-bin", engineBinPlatform(), engineExeName());
+}
+
+function unpackedPath(path: string): string {
+  if (app.isPackaged) {
+    return path.replace("app.asar", "app.asar.unpacked");
+  }
+  return path;
+}
+
+function isFile(path: string): Promise<boolean> {
+  return stat(path).then(
+    (info) => info.isFile(),
+    () => false
+  );
+}
+
+function onPath(command: string): boolean {
+  const target = command.trim();
+  if (target === "") {
+    return false;
+  }
+  const probed = process.platform === "win32"
+    ? spawnSync("where", [target], { encoding: "utf8" })
+    : spawnSync("sh", ["-c", "command -v " + target], { encoding: "utf8" });
+  return probed.status === 0;
+}
+
+function resolveTool(kind: ToolKind): Promise<ToolResolution | null> {
+  if (kind === ToolKind.Engine) {
+    const bundled = bundledEnginePath();
+    return isFile(bundled).then((present): ToolResolution | null => {
+      if (present) {
+        return { command: bundled, prefixArgs: [], source: "bundled engine" };
+      }
+      if (onPath("chromainvert-engine")) {
+        return { command: "chromainvert-engine", prefixArgs: [], source: "PATH" };
+      }
+      if (onPath("python")) {
+        return { command: "python", prefixArgs: ["-m", "chromainvert"], source: "system Python" };
+      }
+      return null;
+    });
+  }
+  const name = kind === ToolKind.Ffmpeg ? "ffmpeg" : "ffprobe";
+  const staticPath = kind === ToolKind.Ffmpeg ? ffmpegStaticPath : ffprobeStaticPath;
+  const bundled: string | null = staticPath === null || staticPath === "" ? null : unpackedPath(staticPath);
+  const checkBundled: Promise<ToolResolution | null> = bundled === null
+    ? Promise.resolve(null)
+    : isFile(bundled).then((present): ToolResolution | null =>
+        present ? { command: bundled, prefixArgs: [], source: "bundled " + name } : null
+      );
+  return checkBundled.then((found): ToolResolution | null => {
+    if (found !== null) {
+      return found;
+    }
+    if (onPath(name)) {
+      return { command: name, prefixArgs: [], source: "PATH" };
+    }
+    return null;
+  });
+}
+
+function missingToolMessage(kind: ToolKind): string {
+  if (kind === ToolKind.Engine) {
+    return "No engine found: reinstall the bundled ChromaInvert release, put chromainvert-engine on PATH, or install Python plus the engine (pip install -e ./engine).";
+  }
+  const name = kind === ToolKind.Ffmpeg ? "ffmpeg" : "ffprobe";
+  return name + " was not found: reinstall the bundled ChromaInvert app, which ships " + name + ", or install FFmpeg and put it on PATH.";
 }
 
 let currentChild: ChildProcess | null = null;
@@ -448,31 +561,47 @@ ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promi
     .then(() => writeFile(jobPath, JSON.stringify(job, null, 2), "utf8"))
     .then(
       (): Promise<DoneResult> =>
-        new Promise<DoneResult>((resolve) => {
-          const child: ChildProcess = spawn("python", ["-m", "chromainvert", "run", jobPath], {
-            cwd: process.cwd()
-          });
-          currentChild = child;
-          let tail = "";
-          child.stdout?.on("data", (chunk: Buffer) => {
-            const text: string = chunk.toString("utf8");
-            tail = (tail + text).slice(-8000);
-            for (const line of text.split("\n")) {
-              const trimmed = line.trim();
-              if (trimmed !== "") {
-                parseLine(trimmed, sender);
+        resolveTool(ToolKind.Engine).then((engine): Promise<DoneResult> => {
+          if (engine === null) {
+            return Promise.resolve({ exitCode: 1, summary: missingToolMessage(ToolKind.Engine) });
+          }
+          sender.send("job:log", "engine: " + engine.source);
+          return new Promise<DoneResult>((resolve) => {
+            const child: ChildProcess = spawn(engine.command, [...engine.prefixArgs, "run", jobPath], {
+              cwd: process.cwd()
+            });
+            currentChild = child;
+            let tail = "";
+            let settled = false;
+            const finish = (result: DoneResult): void => {
+              if (!settled) {
+                settled = true;
+                currentChild = null;
+                resolve(result);
               }
-            }
-          });
-          child.stderr?.on("data", (chunk: Buffer) => {
-            sender.send("job:log", chunk.toString("utf8").trim());
-          });
-          child.on("close", (code: number | null) => {
-            currentChild = null;
-            const exitCode = code ?? 1;
-            resolve({
-              exitCode,
-              summary: exitCode === 0 ? "Done: " + payload.outputCube : "Failed: " + tail.slice(-500)
+            };
+            child.stdout?.on("data", (chunk: Buffer) => {
+              const text: string = chunk.toString("utf8");
+              tail = (tail + text).slice(-8000);
+              for (const line of text.split("\n")) {
+                const trimmed = line.trim();
+                if (trimmed !== "") {
+                  parseLine(trimmed, sender);
+                }
+              }
+            });
+            child.stderr?.on("data", (chunk: Buffer) => {
+              sender.send("job:log", chunk.toString("utf8").trim());
+            });
+            child.on("error", (err: Error) => {
+              finish({ exitCode: 1, summary: "Engine failed to start from " + engine.source + ": " + err.message });
+            });
+            child.on("close", (code: number | null) => {
+              const exitCode = code ?? 1;
+              finish({
+                exitCode,
+                summary: exitCode === 0 ? "Done: " + payload.outputCube : "Failed: " + tail.slice(-500)
+              });
             });
           });
         })

@@ -1,5 +1,20 @@
 # ChromaInvert Progress Log
 
+## 2026-11-05: GUI resolves bundled engine plus static ffmpeg/ffprobe with fallback
+
+Completed:
+- `app/gui/electron/main.ts` resolves the engine with priority bundled `chromainvert-engine` next to `process.resourcesPath`, then `chromainvert-engine` on PATH, then `python -m chromainvert`; stdout JSONL progress parsing is unchanged; a missing engine returns a DoneResult pointing at the bundled release or a Python install.
+- `app/gui/package.json` ships `engine-bin/${os}` via `extraResources` (`${os}` verified against the installed electron-builder as `win`/`mac`/`linux`); empty `.gitkeep` only dirs keep packaging green with no binary staged.
+- Added `ffmpeg-static@5.3.0` and `ffprobe-static@3.1.0`: main requires them and rewrites `app.asar` to `app.asar.unpacked` when packaged; `asarUnpack` keeps both binaries executable outside the archive; per-platform `files` ignores ship only the current OS `ffprobe-static/bin` (the package carries all platforms, about 336 MB).
+- Centralized `resolveTool(ToolKind)` for ffmpeg, ffprobe, and the engine (bundled, then PATH, then engine-only Python fallback); `video:probe` and `video:grab` use the resolved paths; missing tools report reinstall-or-install guidance.
+- Added `app/gui/electron/ffprobe-static.d.ts` (`ffprobe-static` ships no types; `ffmpeg-static` ships its own).
+
+Verified:
+- `cd app/gui && npm run typecheck` and `npm run build`: pass.
+- Static binaries execute: ffmpeg 6.1.1, ffprobe 4.0.2.
+- `npm run dist:dir` on Windows: the unpacked layout holds `ffmpeg.exe` plus only `ffprobe-static/bin/win32` (darwin/linux pruned); both unpacked binaries print their versions.
+- `python -m pytest engine/tests -q`: 131 passed (engine code untouched).
+
 ## 2026-11-05: engine bundle recipe and staging
 
 Completed:

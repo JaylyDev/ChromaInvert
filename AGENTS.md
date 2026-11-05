@@ -26,9 +26,10 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `app/src/ffmpeg.h`, `app/src/ffmpeg.cpp`: unified FFmpeg Level 1 module: `host::` helpers (ffprobe duration probe, frame extraction, `lut3d` preview encode) for the console driver plus the `Ffmpeg` class (rich ffprobe JSON parse, multi-frame extraction with 16-bit plus 8-bit fallback, `lut3d` preview with tetrahedral interp, before/after grab) with unquoted double-level `lut3d` path escaping and output-directory creation.
 - `app/src/Preview.h`, `app/src/Preview.cpp`: graded preview encode plus before/after stills via the `Ffmpeg` class.
 - `app/README.md`: Windows build and run steps for the Electron GUI, both C++ hosts, shared module notes, Level 2 plan.
-- `app/gui/package.json`, `app/gui/vite.config.ts`, `app/gui/index.html`: Electron + React product GUI shell (Vite renderer, TypeScript, no Qt).
+- `app/gui/package.json`, `app/gui/vite.config.ts`, `app/gui/index.html`: Electron + React product GUI shell (Vite renderer, TypeScript, no Qt); ships `engine-bin/${os}` via `extraResources`, unpacks `ffmpeg-static`/`ffprobe-static` via `asarUnpack` with a per-platform ffprobe prune.
 - `app/gui/engine-bin/`: per-platform bundled `chromainvert-engine` binaries (gitignored) plus README; `.gitkeep` placeholders keep packaging green with no binary staged.
-- `app/gui/electron/main.ts`, `app/gui/electron/preload.ts`: Electron main (writes `job.json`, spawns `python -m chromainvert run`, parses stdout JSONL progress) and preload bridge.
+- `app/gui/electron/main.ts`, `app/gui/electron/preload.ts`: Electron main (writes `job.json`, resolves engine/ffmpeg/ffprobe with bundled, PATH, then Python fallback, parses stdout JSONL progress) and preload bridge.
+- `app/gui/electron/ffprobe-static.d.ts`: types the untyped `ffprobe-static` export (`ffmpeg-static` ships its own).
 - `app/gui/src/App.tsx`, `app/gui/src/api.ts`, `app/gui/src/types.ts`: React one-screen GUI (inputs, reference-only predict mode, Match and Cancel, progress bar, status, log tail) on the preload bridge.
 - `scripts/ffmpeg_helpers.py`: FFmpeg Level 1 subprocess helpers (ffprobe parse, 16-bit PNG frame extraction with 8-bit fallback, lut3d preview, before/after, EngineRunner, error surfaces).
 - `docs/GUI_DECISION.md`: Electron + React product decision per issue #9 (Qt rejected for licensing, ImGui rejected as too developer focused, Win32 kept as fallback).

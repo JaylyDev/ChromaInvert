@@ -3,7 +3,7 @@
 Product UI per issue #9 and `docs/GUI_DECISION.md`. React renderer plus Electron main driving the same `job.json` contract as the C++ hosts (`docs/ARCHITECTURE.md`).
 
 - UI: file fields, Match and Cancel, progress bar, status, log tail.
-- Main: writes `job.json` next to the output cube, spawns `python -m chromainvert run`, parses stdout JSONL `progress` lines, forwards them over the preload bridge.
+- Main: writes `job.json` next to the output cube, resolves the engine binary (bundled `chromainvert-engine` in `engine-bin/`, else `chromainvert-engine` on PATH, else `python -m chromainvert`) and the `ffmpeg`/`ffprobe` binaries (static npm binaries unpacked beside the app, else PATH), spawns `run`, parses stdout JSONL `progress` lines, forwards them over the preload bridge. No Python or FFmpeg install is needed when the bundled release ships all three binaries (see `engine-bin/README.md`).
 - C++ stays for FFmpeg and math helpers only. No Qt, no ImGui.
 
 ## Run in dev (two terminals)
