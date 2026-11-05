@@ -1,10 +1,18 @@
 # GUI Framework Decision
 
 Date: 2026-10-29
-Status: superseded 2026-11-01 by issue #9 comment: Electron + React UI, C++ kept for FFmpeg and math helpers
+Status: updated 2026-11-05: Electron + React UI, C++ hosts removed (bundled FFmpeg supersedes the sidecar)
 Related: Section 8.1 of docs/CHROMAINVERT_HACKATHON_PLAN.md, docs/ARCHITECTURE.md, issue #9
 
-## Decision 2026-11-01 (current): Electron + React UI, C++ helpers retained
+## Decision 2026-11-05 (current): Electron + React UI, no C++ hosts
+
+The Win32 desktop fallback and the `chromainvert-host` console driver were
+deleted: the GUI ships its own FFmpeg binaries via `ffmpeg-static` and
+`ffprobe-static`, so the C++ FFmpeg sidecar has no role left. The Python
+mirror of the old helpers lives in `scripts/ffmpeg_helpers.py`. Earlier
+decision history below is kept as a record.
+
+## Decision 2026-11-01 (superseded): Electron + React UI, C++ helpers retained
 
 Per the issue #9 comment, the product UI is Electron + React. C++ stays for FFmpeg and math helpers (`app/src/job_runner.*`, `app/src/ffmpeg.*`, `app/src/Preview.*`, `app/src/host_main.cpp`). The new GUI lives in `app/gui/` and drives the same `job.json` contract (ARCHITECTURE.md v2) by spawning `python -m chromainvert run` or `chromainvert-host`, then parsing stdout JSONL progress.
 

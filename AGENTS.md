@@ -4,7 +4,7 @@ ChromaInvert is a perceptual video and LUT reverse-engineering engine. Matching 
 
 ## What this repo is
 
-Python engine plus C++ desktop host monorepo. Python source lives under `engine/chromainvert/`, tests under `engine/tests/`. Planning docs live in `docs/`, helper scripts in `scripts/`, test footage notes in `assets/`, and the C++ app skeleton in `app/`. `work/` and `.venv/` are gitignored runtime and environment directories.
+Python engine plus Electron GUI monorepo. Python source lives under `engine/chromainvert/`, tests under `engine/tests/`. Planning docs live in `docs/`, helper scripts in `scripts/`, test footage notes in `assets/`, and the Electron product GUI in `app/gui/`. `work/` and `.venv/` are gitignored runtime and environment directories.
 
 ## Parts of the project
 
@@ -19,20 +19,14 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `engine/chromainvert-engine.spec`: PyInstaller directory-bundle recipe exposing the same CLI (`run`, `predict`, `benchmark`); single-file is avoided because torch's cuDNN DLLs fail to extract from a onefile archive on Windows. Build on each release platform, staged via `scripts/build_engine_bundle.py`.
 - `engine/chromainvert/lut_predictor.py`: single-image LUT predictor; 38 grade statistics plus a residual MLP around identity, 17 lattice spline-upsampled to 33. No checkpoint is shipped; checkpoints are never committed since they distill their training LUTs; see `data/README.md` and pass the file via `predict_weights` or `--weights`.
 - `engine/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000) plus the seeded random-RGB probe heldout gate and `style_probe_metrics` for LUT-to-LUT comparison on a random probe.
-- `app/CMakeLists.txt`: builds both the Win32 `ChromaInvert` desktop host and the `chromainvert-host` console driver (C++17, standard library only); the desktop target also compiles the shared `ffmpeg` module and `Preview` for the upcoming preview pane.
-- `app/src/main.cpp`, `app/src/MainWindow.*`, `app/src/JobRunner.*`: Win32 desktop host fallback (file pickers, Match and Cancel, progress bar, log pane). JobRunner writes `job.json`, spawns the engine, parses stdout JSONL progress. Product GUI is Electron + React in `app/gui/` per `docs/GUI_DECISION.md`; no Qt port.
-- `app/src/host_main.cpp`: `chromainvert-host run` and `preview` subcommands, flag parsing, frame extraction orchestration.
-- `app/src/job_runner.h`, `app/src/job_runner.cpp`: `job.json` writer (contract v1), engine subprocess spawn with JSONL progress parsing, `report.json` summary.
-- `app/src/ffmpeg.h`, `app/src/ffmpeg.cpp`: unified FFmpeg Level 1 module: `host::` helpers (ffprobe duration probe, frame extraction, `lut3d` preview encode) for the console driver plus the `Ffmpeg` class (rich ffprobe JSON parse, multi-frame extraction with 16-bit plus 8-bit fallback, `lut3d` preview with tetrahedral interp, before/after grab) with unquoted double-level `lut3d` path escaping and output-directory creation.
-- `app/src/Preview.h`, `app/src/Preview.cpp`: graded preview encode plus before/after stills via the `Ffmpeg` class.
-- `app/README.md`: Windows build and run steps for the Electron GUI, both C++ hosts, shared module notes, Level 2 plan.
+- `app/README.md`: Windows run steps for the Electron GUI.
 - `app/gui/package.json`, `app/gui/vite.config.ts`, `app/gui/index.html`: Electron + React product GUI shell (Vite renderer, TypeScript, no Qt); ships `engine-bin/${os}` via `extraResources`, unpacks `ffmpeg-static`/`ffprobe-static` via `asarUnpack` with a per-platform ffprobe prune.
 - `app/gui/engine-bin/`: per-platform bundled `chromainvert-engine` binaries (gitignored) plus README; every `dist*` script runs `scripts/ensure-engine-bin.js` so packaging succeeds with no binary staged.
 - `app/gui/electron/main.ts`, `app/gui/electron/preload.ts`: Electron main (writes `job.json`, resolves engine/ffmpeg/ffprobe with bundled, PATH, then Python fallback, first-run `env:check`/`env:setup` PyPI install with progress, parses stdout JSONL progress) and preload bridge.
 - `app/gui/electron/ffprobe-static.d.ts`: types the untyped `ffprobe-static` export (`ffmpeg-static` ships its own).
 - `app/gui/src/App.tsx`, `app/gui/src/api.ts`, `app/gui/src/types.ts`: React one-screen GUI (inputs, reference-only predict mode, Match and Cancel, progress bar, status, log tail) on the preload bridge.
 - `scripts/ffmpeg_helpers.py`: FFmpeg Level 1 subprocess helpers (ffprobe parse, 16-bit PNG frame extraction with 8-bit fallback, lut3d preview, before/after, EngineRunner, error surfaces).
-- `docs/GUI_DECISION.md`: Electron + React product decision per issue #9 (Qt rejected for licensing, ImGui rejected as too developer focused, Win32 kept as fallback).
+- `docs/GUI_DECISION.md`: Electron + React product decision per issue #9 (Qt rejected for licensing, ImGui rejected as too developer focused).
 - `scripts/validate_cube.py`: FFmpeg `lut3d` acceptance check for exported cubes.
 - `scripts/premiere_validation.py`: FFmpeg `lut3d` vs Python `DifferentiableLUT3D` comparison with tetrahedral gap check and optional Premiere still scoring.
 - `scripts/run_benchmark.py`: runs the synthetic benchmark and writes `work/benchmark.json`.
@@ -57,7 +51,7 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `docs/PREMIERE_VALIDATION.md`: Premiere Pro MCP validation procedure, thresholds, and SampleFootage steps.
 - `docs/PROGRESS.md`: timestamped build log, updated with every feature.
 - `engine/tests/test_*.py`: one test module per engine module above; update both together.
-- `.github/workflows/tests.yml`: CI workflow running `python -m pytest engine/tests -q` on Ubuntu plus an MSVC Release build of `app` on Windows, on push and pull request.
+- `.github/workflows/tests.yml`: CI workflow running `python -m pytest engine/tests -q` on Ubuntu on push and pull request.
 - `.github/workflows/gui.yml`: CI matrix on `windows-latest`, `macos-latest`, and `ubuntu-latest` running GUI `npm ci`, `typecheck`, `build`, and per-platform `electron-builder` packaging with artifact upload, on push and pull request.
 
 ## Build and run
