@@ -264,9 +264,9 @@ function engineBinPlatform(): string {
 
 function bundledEnginePath(): string {
   if (app.isPackaged) {
-    return join(process.resourcesPath, "engine-bin", engineExeName());
+    return join(process.resourcesPath, "engine-bin", "chromainvert-engine", engineExeName());
   }
-  return join(__dirname, "..", "..", "engine-bin", engineBinPlatform(), engineExeName());
+  return join(__dirname, "..", "..", "engine-bin", engineBinPlatform(), "chromainvert-engine", engineExeName());
 }
 
 function unpackedPath(path: string): string {

@@ -1,12 +1,13 @@
-"""Build the single-file chromainvert-engine executable and stage it for the GUI.
+"""Build the chromainvert-engine directory bundle and stage it for the GUI.
 
 Dev-machine command (run from the repo root):
 
     python scripts/build_engine_bundle.py
 
 This runs PyInstaller on engine/chromainvert-engine.spec, then copies the
-binary to app/gui/engine-bin/<platform>/ (win, mac, or linux), which
-electron-builder ships inside the installed app via extraResources (see
+`chromainvert-engine` bundle directory to
+app/gui/engine-bin/<platform>/chromainvert-engine/ (win, mac, or linux),
+which electron-builder ships inside the installed app via extraResources (see
 app/gui/package.json). The GUI prefers the bundled binary, then
 chromainvert-engine on PATH, then `python -m chromainvert`.
 
@@ -41,14 +42,15 @@ def resolve_platform(raw: str) -> str:
     return host
 
 
-def find_binary(dist_dir: Path) -> Path:
-    exe = dist_dir / "chromainvert-engine.exe"
-    if exe.is_file():
-        return exe
-    plain = dist_dir / "chromainvert-engine"
-    if plain.is_file():
-        return plain
-    raise SystemExit(f"no chromainvert-engine binary in {dist_dir}: build first without --skip-build")
+def find_bundle(dist_dir: Path) -> Path:
+    bundled = dist_dir / "chromainvert-engine"
+    if not bundled.is_dir():
+        raise SystemExit(f"no chromainvert-engine bundle in {dist_dir}: build first without --skip-build")
+    exe = bundled / "chromainvert-engine.exe"
+    plain = bundled / "chromainvert-engine"
+    if not exe.is_file() and not plain.is_file():
+        raise SystemExit(f"no chromainvert-engine binary in {bundled}: build first without --skip-build")
+    return bundled
 
 
 def main() -> int:
@@ -63,12 +65,12 @@ def main() -> int:
             cwd=ENGINE_DIR,
             check=True,
         )
-    binary = find_binary(ENGINE_DIR / "dist")
-    dest_dir = STAGE_ROOT / staged
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / binary.name
-    shutil.copy2(binary, dest)
-    print(f"staged {dest}")
+    bundle = find_bundle(ENGINE_DIR / "dist")
+    dest_dir = STAGE_ROOT / staged / "chromainvert-engine"
+    if dest_dir.exists():
+        shutil.rmtree(dest_dir)
+    shutil.copytree(bundle, dest_dir)
+    print(f"staged {dest_dir}")
     print("next: cd app/gui && npm run dist")
     return 0
 

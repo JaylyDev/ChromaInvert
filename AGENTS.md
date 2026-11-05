@@ -16,7 +16,7 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `engine/chromainvert/spline.py`: separable Catmull-Rom upsampling for coarse-to-fine lattices.
 - `engine/chromainvert/optimize.py`: Adam optimization loop with seeded pixel sampling, the `OptimizeConfig` weights, and the `deterministic` GPU mode flag.
 - `engine/chromainvert/cli.py`: `chromainvert run job.json`, `chromainvert predict image`, and `chromainvert benchmark` entry points; `run` accepts `reference_only` jobs with `predict_weights`.
-- `engine/chromainvert-engine.spec`: PyInstaller single-file bundle recipe exposing the same CLI (`run`, `predict`, `benchmark`); build on each release platform, staged via `scripts/build_engine_bundle.py`.
+- `engine/chromainvert-engine.spec`: PyInstaller directory-bundle recipe exposing the same CLI (`run`, `predict`, `benchmark`); single-file is avoided because torch's cuDNN DLLs fail to extract from a onefile archive on Windows. Build on each release platform, staged via `scripts/build_engine_bundle.py`.
 - `engine/chromainvert/lut_predictor.py`: single-image LUT predictor; 38 grade statistics plus a residual MLP around identity, 17 lattice spline-upsampled to 33. No checkpoint is shipped; checkpoints are never committed since they distill their training LUTs; see `data/README.md` and pass the file via `predict_weights` or `--weights`.
 - `engine/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000) plus the seeded random-RGB probe heldout gate and `style_probe_metrics` for LUT-to-LUT comparison on a random probe.
 - `app/CMakeLists.txt`: builds both the Win32 `ChromaInvert` desktop host and the `chromainvert-host` console driver (C++17, standard library only); the desktop target also compiles the shared `ffmpeg` module and `Preview` for the upcoming preview pane.
@@ -44,7 +44,7 @@ Python engine plus C++ desktop host monorepo. Python source lives under `engine/
 - `scripts/evaluate_single_image.py`: paired recovery and predictor check on one manifest pair with style-probe and heldout DeltaE2000 plus baselines; `--weights` adds the predicted LUT comparison.
 - `scripts/make_training_data.py`: builds predictor training data in working space (real frames graded with real 33x LUTs plus mild parametric grades and identity).
 - `scripts/train_lut_predictor.py`: trains the predictor MLP with held-out LUT validation, writes weights plus metrics JSON.
-- `scripts/build_engine_bundle.py`: builds the PyInstaller engine bundle and stages the binary into `app/gui/engine-bin/<platform>/`.
+- `scripts/build_engine_bundle.py`: builds the PyInstaller engine bundle and stages the `chromainvert-engine` directory into `app/gui/engine-bin/<platform>/`.
 - `engine/tests/test_predict.py`: predict CLI and reference-only run acceptance, rejection, and weights requirement.
 - `engine/tests/test_lut_predictor.py`: feature determinism, near-identity init, single-sample overfit, 17 to 33 upsample export.
 - `scripts/extract_frames.py`: extracts N frames from a video via FFmpeg.

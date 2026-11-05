@@ -1,6 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
-# ChromaInvert engine bundle: single-file executable exposing the same CLI
+# ChromaInvert engine bundle: directory bundle exposing the same CLI
 # as `python -m chromainvert` (run, predict, benchmark).
+#
+# Directory mode (not single-file): torch ships multi-hundred-megabyte
+# cuDNN DLLs that the single-file bootloader cannot reliably extract on
+# Windows, so the engine ships as `chromainvert-engine/<exe plus libs>`.
 #
 # Build on a dev machine with the engine env installed (torch, numpy, imageio):
 #   cd engine
@@ -32,14 +36,21 @@ pyz = PYZ(a.pure, a.zipped_data)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name="chromainvert-engine",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
     console=True,
+)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    name="chromainvert-engine",
 )

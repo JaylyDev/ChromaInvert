@@ -1,5 +1,11 @@
 # ChromaInvert Progress Log
 
+## 2026-11-05: Engine bundle switches to directory mode
+
+Completed:
+- Single-file `chromainvert-engine.exe` built but failed at startup (`Failed to extract cudnn_adv64_9.dll`): torch's multi-hundred-megabyte cuDNN DLLs do not survive the onefile bootloader on Windows. The spec now uses `COLLECT` directory mode; the bundle stages to `app/gui/engine-bin/<platform>/chromainvert-engine/` and the GUI resolves the exe inside it. Smoke test: staged `chromainvert-engine.exe --help` lists `run`, `predict`, `benchmark`.
+- Also fixed the dev-mode bundled-engine lookup (two levels up from `dist-electron/electron`) and removed the obsolete `pathlib` backport blocking PyInstaller.
+
 ## 2026-11-05: GUI resolves bundled engine plus static ffmpeg/ffprobe with fallback
 
 Completed:
