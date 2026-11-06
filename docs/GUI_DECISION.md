@@ -14,7 +14,7 @@ decision history below is kept as a record.
 
 ## Decision 2026-11-01 (superseded): Electron + React UI, native helpers retained
 
-Per the issue #9 comment, the product UI is Electron + React. Native helpers covered FFmpeg and math at the time. The new GUI lives in `app/gui/` and drives the same `job.json` contract (ARCHITECTURE.md v2) by spawning `python -m chromainvert run`, then parsing stdout JSONL progress.
+Per the issue #9 comment, the product UI is Electron + React. Native helpers covered FFmpeg and math at the time. The new GUI lives in `app/` and drives the same `job.json` contract (ARCHITECTURE.md v2) by spawning `python -m chromainvert run`, then parsing stdout JSONL progress.
 
 - Qt 6 framework: rejected. Mixed LGPL, GPLv3, and commercial licensing makes this project risky.
 - Dear ImGui: rejected for the product UI. It looks too developer focused for a consumer product. May be revisited only for internal debug views.
@@ -45,7 +45,7 @@ Cons:
 - Looks like a debug tool, not a product; extra work to polish.
 - Still needs GLFW or SDL via vcpkg or vendored source, so similar bootstrapping as Qt.
 
-Verdict: rejected for the product UI per issue #9: looks too developer focused for a consumer product. The Electron GUI in `app/gui/` is the product path.
+Verdict: rejected for the product UI per issue #9: looks too developer focused for a consumer product. The Electron GUI in `app/` is the product path.
 
 ### CLI only + web demo page (fallback)
 Pros: zero GUI risk, contract stays CLI.
@@ -55,11 +55,11 @@ Verdict: kept as fallback; the console host for issue #3 provides this.
 
 ### Legacy note: native desktop fallback (removed 2026-11-05)
 
-The earlier pragmatic choice for issue #9 was a native desktop fallback that satisfied the one-screen spec without extra dependencies. It proved file pickers, Match and Cancel buttons, a progress bar driven by engine JSONL, Strength plus LUT size plus device controls, and a log pane. It was deleted with the console driver once the GUI bundled FFmpeg; the Electron GUI in `app/gui/` is the only product path.
+The earlier pragmatic choice for issue #9 was a native desktop fallback that satisfied the one-screen spec without extra dependencies. It proved file pickers, Match and Cancel buttons, a progress bar driven by engine JSONL, Strength plus LUT size plus device controls, and a log pane. It was deleted with the console driver once the GUI bundled FFmpeg; the Electron GUI in `app/` is the only product path.
 
 ## Consequences
 
-- Package: `cd app/gui && npm run dist` produces the per-OS installer in `release/` (Windows setup plus portable, macOS dmg plus zip, Linux AppImage plus deb).
+- Package: `cd app && npm run dist` produces the per-OS installer in `release/` (Windows setup plus portable, macOS dmg plus zip, Linux AppImage plus deb).
 - Runtime deps: system Python with `chromainvert` installed via pip. Missing engine shows the Environment setup panel with an Install button, per Section 8.4. FFmpeg and ffprobe ship inside the app; in-app preview arrives with #10.
 - No embedded Python: subprocess plus files, per Section 4.1. The log pane shows the engine JSONL tail.
 - Next issues: #10 (FFmpeg decode and preview link) and #11 (scopes) build on this GUI without framework churn.
@@ -70,9 +70,9 @@ Prerequisites:
 - Node 22
 - Python 3.10 or newer (the app installs `chromainvert` from PyPI on first run)
 
-Electron GUI (product path, in `app/gui/`):
+Electron GUI (product path, in `app/`):
 ```
-cd app/gui
+cd app
 npm install
 npm run dev
 ```
