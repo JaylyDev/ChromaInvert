@@ -7,8 +7,8 @@ Built for the Meta Global AI Developer Hackathon (Oct 26 to Nov 4, 2026), Indie 
 ## Meta Global AI Hackathon 2026: submission overview
 
 - Track and problem statement: Indie Developer, Build for Your World. Portable color matching for creators and small post houses.
-- Provenance (Oct 26 to Nov 4, 2026): built 100 percent from scratch during the hackathon window.
-- Meta AI usage: Muse Spark series wrote the engine and GUI code. Muse Wonder reviewed architecture and PRs (see `docs/PROGRESS.md`). The grading run itself is local (PyTorch plus FFmpeg) with no model API calls and no network.
+- Provenance (Oct 26 to Nov 4, 2026): built 100% from scratch during the hackathon window.
+- Meta AI usage: Muse Spark 1.3 and Muse Spark Open (open weights served by Baseten) wrote the engine and GUI code. Muse Wonder reviewed architecture and PRs (see `docs/PROGRESS.md`). The grading run itself is local (PyTorch plus FFmpeg) with no model API calls and no network.
 - Bonus prize targeted: Best Creative Build.
 - Demo video (3 min): https://www.youtube.com/watch?v=0d8jhrCcYSA
 - Keyless check: `python scripts/run_benchmark.py` runs with no footage, no GPU, and no keys. It gates on 40 percent DeltaE2000 improvement.
@@ -57,7 +57,7 @@ Prebuilt installers are attached to each GitHub Release (`v*` tags): https://git
 - macOS: open the `.dmg` and drag ChromaInvert to Applications. The build is unsigned, so if Gatekeeper blocks the first launch, right-click the app and choose Open.
 - Linux: make the `.AppImage` executable and run it, or install the `.deb` with `dpkg -i`.
 
-First run: video import uses Chromium first with system FFmpeg on PATH as fallback for codecs Chromium cannot play. The engine installs once via the Environment panel: press Install engine with Python 3.10 or newer on PATH and internet access (installs `chromainvert` from PyPI with torch, numpy, and imageio; it can take several minutes). Reference-only predict mode additionally needs a weights `.pt` file: train one with `scripts/train_lut_predictor.py` and pick it in the weights field.
+First run: video import uses Chromium first with system FFmpeg on PATH as fallback for codecs Chromium cannot play. The engine installs once via the Environment panel: press Install engine with Python 3.10 or newer on PATH and internet access (installs [`chromainvert`](https://pypi.org/project/chromainvert/) from PyPI with torch, numpy, and imageio; it can take several minutes). Reference-only predict mode additionally needs a weights `.pt` file: train one with `scripts/train_lut_predictor.py` and pick it in the weights field.
 
 Basic Match workflow in the app:
 
