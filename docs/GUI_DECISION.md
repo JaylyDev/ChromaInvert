@@ -1,14 +1,14 @@
 # GUI Framework Decision
 
 Date: 2026-10-29
-Status: updated 2026-11-05: Electron + React UI, old native hosts removed (bundled FFmpeg supersedes the sidecar)
+Status: updated 2026-11-06: Electron + React UI, old native hosts removed (Chromium capture with FFmpeg fallback, no bundled GPL binaries)
 Related: Section 8.1 of docs/CHROMAINVERT_HACKATHON_PLAN.md, docs/ARCHITECTURE.md, issue #9
 
-## Decision 2026-11-05 (current): Electron + React UI, no native hosts
+## Decision 2026-11-06 (current): Electron + React UI, no native hosts
 
 The old desktop fallback and console driver were
-deleted: the GUI ships its own FFmpeg binaries via `ffmpeg-static` and
-`ffprobe-static`, so the old FFmpeg sidecar has no role left. The Python
+deleted: the GUI captures with Chromium (`video` plus `canvas`) and falls back
+to system FFmpeg on PATH, so no standalone GPL ffmpeg or ffprobe binary ships in the installer. The Python
 mirror of the old helpers lives in `scripts/ffmpeg_helpers.py`. Earlier
 decision history below is kept as a record.
 
@@ -55,12 +55,12 @@ Verdict: kept as fallback; the console host for issue #3 provides this.
 
 ### Legacy note: native desktop fallback (removed 2026-11-05)
 
-The earlier pragmatic choice for issue #9 was a native desktop fallback that satisfied the one-screen spec without extra dependencies. It proved file pickers, Match and Cancel buttons, a progress bar driven by engine JSONL, Strength plus LUT size plus device controls, and a log pane. It was deleted with the console driver once the GUI bundled FFmpeg; the Electron GUI in `app/gui/` is the only product path.
+The earlier pragmatic choice for issue #9 was a native desktop fallback that satisfied the one-screen spec without extra dependencies. It proved file pickers, Match and Cancel buttons, a progress bar driven by engine JSONL, Strength plus LUT size plus device controls, and a log pane. It was deleted with the console driver when the GUI took over video import; the Electron GUI in `app/gui/` is the only product path.
 
 ## Consequences
 
 - Package: `cd app/gui && npm run dist` produces the per-OS installer in `release/` (Windows setup plus portable, macOS dmg plus zip, Linux AppImage plus deb).
-- Runtime deps: system Python with `chromainvert` installed via pip. Missing engine shows the Environment setup panel with an Install button, per Section 8.4. FFmpeg and ffprobe ship inside the app; in-app preview arrives with #10.
+- Runtime deps: system Python with `chromainvert` installed via pip. Missing engine shows the Environment setup panel with an Install button, per Section 8.4. Video import uses Chromium first with system FFmpeg on PATH as fallback; no binary ships inside the app.
 - No embedded Python: subprocess plus files, per Section 4.1. The log pane shows the engine JSONL tail.
 - Next issues: #10 (FFmpeg decode and preview link) and #11 (scopes) build on this GUI without framework churn.
 

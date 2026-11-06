@@ -6,9 +6,9 @@ its stdout JSONL progress protocol. See `docs/GUI_DECISION.md` for the
 Electron decision (Qt rejected for licensing, ImGui rejected as too developer
 focused).
 
-The GUI ships its own FFmpeg binaries via `ffmpeg-static` and
-`ffprobe-static`. The Python mirror of the old helpers lives in
-`scripts/ffmpeg_helpers.py`.
+The GUI captures video frames with Chromium (`video` plus `canvas`) and falls
+back to system FFmpeg on PATH for codecs Chromium cannot play. The Python
+mirror of the old helpers lives in `scripts/ffmpeg_helpers.py`.
 
 ## Product GUI (Electron + React, in `gui/`)
 

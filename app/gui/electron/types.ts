@@ -55,6 +55,11 @@ export interface FrameGrab {
   error: string;
 }
 
+export interface VideoTools {
+  ffmpeg: boolean;
+  ffprobe: boolean;
+}
+
 export interface EnvStatus {
   python: string;
   engineOk: boolean;

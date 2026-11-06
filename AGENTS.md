@@ -20,10 +20,9 @@ Python engine plus Electron GUI monorepo. Python source lives under `engine/src/
 - `engine/src/chromainvert/benchmark.py`: synthetic ground-truth recovery benchmark (known LUT applied to test charts, recovered blind, scored with mean DeltaE2000) plus the seeded random-RGB probe heldout gate and `style_probe_metrics` for LUT-to-LUT comparison on a random probe.
 - `engine/LICENSE`: Apache-2.0 copy of the repo root license so the `engine/` sdist and wheel carry license files per PEP 639 (`license-files`).
 - `app/README.md`: Windows run steps for the Electron GUI.
-- `app/gui/package.json`, `app/gui/vite.config.ts`, `app/gui/index.html`: Electron + React product GUI shell (Vite renderer, TypeScript, no Qt); unpacks `ffmpeg-static`/`ffprobe-static` via `asarUnpack` with a per-platform ffprobe prune.
-- `app/gui/electron/main.ts`, `app/gui/electron/preload.ts`: Electron main (writes `job.json`, resolves the engine via the pip-installed `chromainvert` on PATH then system Python, resolves ffmpeg/ffprobe via static npm binaries or PATH, first-run `env:check`/`env:setup` install via pip with progress, parses stdout JSONL progress) and preload bridge.
-- `app/gui/electron/ffprobe-static.d.ts`: types the untyped `ffprobe-static` export (`ffmpeg-static` ships its own).
-- `app/gui/src/App.tsx`, `app/gui/src/api.ts`, `app/gui/src/types.ts`: React one-screen GUI (inputs, reference-only predict mode, Match and Cancel, progress bar, status, log tail) on the preload bridge.
+- `app/gui/package.json`, `app/gui/vite.config.ts`, `app/gui/index.html`: Electron + React product GUI shell (Vite renderer, TypeScript, no Qt); no bundled GPL ffmpeg/ffprobe binaries.
+- `app/gui/electron/main.ts`, `app/gui/electron/preload.ts`: Electron main (writes `job.json`, resolves the engine via the pip-installed `chromainvert` on PATH then system Python, resolves system ffmpeg/ffprobe on PATH as fallback, saves Chromium canvas captures, first-run `env:check`/`env:setup` install via pip with progress, parses stdout JSONL progress) and preload bridge.
+- `app/gui/src/App.tsx`, `app/gui/src/api.ts`, `app/gui/electron/types.ts`: React one-screen GUI (video import with Chromium capture plus FFmpeg fallback, reference-only predict mode, Match and Cancel, progress bar, status, log tail) on the preload bridge.
 - `scripts/ffmpeg_helpers.py`: FFmpeg Level 1 subprocess helpers (ffprobe parse, 16-bit PNG frame extraction with 8-bit fallback, lut3d preview, before/after, EngineRunner, error surfaces).
 - `docs/GUI_DECISION.md`: Electron + React product decision per issue #9 (Qt rejected for licensing, ImGui rejected as too developer focused).
 - `scripts/validate_cube.py`: FFmpeg `lut3d` acceptance check for exported cubes.

@@ -3,7 +3,7 @@
 Product UI per issue #9 and `docs/GUI_DECISION.md`. React renderer plus Electron main driving the `job.json` contract (`docs/ARCHITECTURE.md`).
 
 - UI: file fields, Match and Cancel, progress bar, status, log tail.
-- Main: writes `job.json` next to the output cube, resolves the engine (`chromainvert` console script on PATH, else `python -m chromainvert`, else press Install in the Environment setup (installs the engine via pip)) and the `ffmpeg`/`ffprobe` binaries (static npm binaries unpacked beside the app, else PATH), spawns `run`, parses stdout JSONL `progress` lines, forwards them over the preload bridge. The engine is installed via pip, so the installer ships no Python engine binary; `ffmpeg`/`ffprobe` still ship inside the app.
+- Main: writes `job.json` next to the output cube, resolves the engine (`chromainvert` console script on PATH, else `python -m chromainvert`, else press Install in the Environment setup (installs the engine via pip)) and system `ffmpeg`/`ffprobe` on PATH as fallback for codecs Chromium cannot play, spawns `run`, parses stdout JSONL `progress` lines, forwards them over the preload bridge. Video import captures with Chromium (`video` plus `canvas`) first. The engine is installed via pip, so the installer ships no Python engine binary and no standalone GPL `ffmpeg`/`ffprobe` binary.
 - No Qt, no ImGui.
 
 ## Run in dev (two terminals)
@@ -58,7 +58,7 @@ Prebuilt installers are attached to each GitHub Release: https://github.com/Jayl
 - macOS: open the `.dmg` and drag ChromaInvert to Applications. The build is unsigned, so if Gatekeeper blocks the first launch, right-click the app and choose Open.
 - Linux: make the `.AppImage` executable and run it, or install the `.deb` with `dpkg -i`.
 
-First run: FFmpeg ships inside the app. The engine installs once via the Environment panel: press Install engine with Python 3.10 or newer on PATH and internet access (installs `chromainvert` from PyPI with torch, numpy, and imageio; it can take several minutes). Reference-only predict mode additionally needs a weights `.pt` file: train one with `scripts/train_lut_predictor.py` and pick it in the weights field.
+First run: video import uses Chromium first with system FFmpeg on PATH as fallback for codecs Chromium cannot play. The engine installs once via the Environment panel: press Install engine with Python 3.10 or newer on PATH and internet access (installs `chromainvert` from PyPI with torch, numpy, and imageio; it can take several minutes). Reference-only predict mode additionally needs a weights `.pt` file: train one with `scripts/train_lut_predictor.py` and pick it in the weights field.
 
 Basic Match workflow:
 

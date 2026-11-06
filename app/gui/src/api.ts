@@ -1,4 +1,4 @@
-import type { DoneResult, EnvStatus, FrameGrab, JobConfig, ProgressUpdate, SetupProgress, VideoProbe } from "../electron/types";
+import type { DoneResult, EnvStatus, FrameGrab, JobConfig, ProgressUpdate, SetupProgress, VideoProbe, VideoTools } from "../electron/types";
 
 export interface GuiBridge {
   runJob: (config: JobConfig) => Promise<DoneResult>;
@@ -7,8 +7,10 @@ export interface GuiBridge {
   pickReferenceFrames: () => Promise<string[]>;
   pickSourceVideo: () => Promise<string | null>;
   pickReferenceVideo: () => Promise<string | null>;
+  videoTools: () => Promise<VideoTools>;
   probeVideo: (videoPath: string) => Promise<VideoProbe>;
   grabFrame: (videoPath: string, timestamp: number, kind: string, outputDir: string) => Promise<FrameGrab>;
+  saveCapture: (pngBase64: string, timestamp: number, kind: string, outputDir: string) => Promise<FrameGrab>;
   pickOutputCube: (suggestedPath: string) => Promise<string | null>;
   pickWeights: () => Promise<string | null>;
   checkEnv: () => Promise<EnvStatus>;

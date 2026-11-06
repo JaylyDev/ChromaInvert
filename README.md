@@ -33,7 +33,7 @@ Full gates and probe numbers are in `report.json` and `docs/PREMIERE_VALIDATION.
 
 ## Quickstart
 
-Start with the app. Grab the installer from GitHub Releases and launch ChromaInvert (see Download and use the GUI below). Pick a source clip and a reference frame. Choose the output `.cube` path and press Match. The packaged app ships FFmpeg inside it and installs the engine via pip on first run.
+Start with the app. Grab the installer from GitHub Releases and launch ChromaInvert (see Download and use the GUI below). Pick a source clip and a reference frame. Choose the output `.cube` path and press Match. The packaged app captures with Chromium and falls back to system FFmpeg on PATH, and installs the engine via pip on first run.
 
 ![ChromaInvert GUI showing video import and run panels](assets/gui-screenshot.png)
 
@@ -57,7 +57,7 @@ Prebuilt installers are attached to each GitHub Release (`v*` tags): https://git
 - macOS: open the `.dmg` and drag ChromaInvert to Applications. The build is unsigned, so if Gatekeeper blocks the first launch, right-click the app and choose Open.
 - Linux: make the `.AppImage` executable and run it, or install the `.deb` with `dpkg -i`.
 
-First run: FFmpeg ships inside the app. The engine installs once via the Environment panel: press Install engine with Python 3.10 or newer on PATH and internet access (installs `chromainvert` from PyPI with torch, numpy, and imageio; it can take several minutes). Reference-only predict mode additionally needs a weights `.pt` file: train one with `scripts/train_lut_predictor.py` and pick it in the weights field.
+First run: video import uses Chromium first with system FFmpeg on PATH as fallback for codecs Chromium cannot play. The engine installs once via the Environment panel: press Install engine with Python 3.10 or newer on PATH and internet access (installs `chromainvert` from PyPI with torch, numpy, and imageio; it can take several minutes). Reference-only predict mode additionally needs a weights `.pt` file: train one with `scripts/train_lut_predictor.py` and pick it in the weights field.
 
 Basic Match workflow in the app:
 
