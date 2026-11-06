@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { getBridge, isDesktop } from "./api";
-import type { DoneResult, EnvStatus, JobConfig, ProgressUpdate, VideoProbe } from "../electron/types";
+import type { GuiBridge } from "./api";
+import type { DoneResult, EnvStatus, FrameGrab, JobConfig, ProgressUpdate, VideoProbe, VideoTools } from "../electron/types";
 import { RunPhase } from "../electron/types";
 
 interface FrameListProps {
@@ -114,6 +115,25 @@ function formatSeconds(value: number): string {
   return value.toFixed(2) + "s";
 }
 
+function probeMetaText(probe: VideoProbe | null): string {
+  if (probe === null) {
+    return "No probe yet. Browse a file to read duration.";
+  }
+  if (probe.error !== "") {
+    return probe.error;
+  }
+  const size = probe.width + "x" + probe.height;
+  const extras: string[] = [];
+  if (probe.codec !== "" && probe.codec !== "unknown") {
+    extras.push(probe.codec);
+  }
+  if (probe.fps !== "" && probe.fps !== "unknown") {
+    extras.push(probe.fps + " fps");
+  }
+  const head = extras.length === 0 ? size : size + " " + extras.join(" ");
+  return head + ", " + formatSeconds(probe.duration);
+}
+
 function dirOfCube(cubePath: string): string {
   const trimmed = cubePath.trim();
   const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
@@ -126,6 +146,137 @@ function probeDuration(probe: VideoProbe | null): number {
     return -1;
   }
   return probe.duration;
+}
+
+// Chromium-first probe: no binary, works for H.264 and VP9 in Electron.
+// Returns null when the codec is outside Chromium support so PATH ffprobe can run.
+function probeWithElement(videoPath: string): Promise<VideoProbe | null> {
+  if (typeof document === "undefined" || videoPath.trim() === "") {
+    return Promise.resolve(null);
+  }
+  return new Promise<VideoProbe | null>((resolve) => {
+    let settled = false;
+    const el = document.createElement("video");
+    const finish = (value: VideoProbe | null): void => {
+      if (!settled) {
+        settled = true;
+        el.removeAttribute("src");
+        resolve(value);
+      }
+    };
+    const timer = window.setTimeout(() => finish(null), 15000);
+    el.preload = "metadata";
+    el.muted = true;
+    el.onloadedmetadata = (): void => {
+      window.clearTimeout(timer);
+      const duration = Number(el.duration);
+      const probe: VideoProbe = {
+        path: videoPath,
+        duration: Number.isFinite(duration) && duration > 0 ? duration : -1,
+        width: el.videoWidth,
+        height: el.videoHeight,
+        fps: "unknown",
+        codec: "unknown",
+        error: ""
+      };
+      finish(el.videoWidth > 0 ? probe : null);
+    };
+    el.onerror = (): void => {
+      window.clearTimeout(timer);
+      finish(null);
+    };
+    el.src = toFileUrl(videoPath);
+  });
+}
+
+function blobToBase64(blob: Blob): Promise<string | null> {
+  return new Promise<string | null>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (): void => {
+      const text = typeof reader.result === "string" ? reader.result : "";
+      const cut = text.indexOf(",");
+      resolve(cut < 0 ? null : text.slice(cut + 1));
+    };
+    reader.onerror = (): void => resolve(null);
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Chromium-first capture: seek, draw to canvas, save via main. Null means fallback.
+function captureWithElement(bridge: GuiBridge, videoPath: string, timestamp: number, kind: string, outputDir: string): Promise<FrameGrab | null> {
+  const time = Number.isFinite(timestamp) && timestamp >= 0 ? timestamp : 0;
+  if (typeof document === "undefined" || videoPath.trim() === "") {
+    return Promise.resolve(null);
+  }
+  return new Promise<FrameGrab | null>((resolve) => {
+    let settled = false;
+    const el = document.createElement("video");
+    const finish = (value: FrameGrab | null): void => {
+      if (!settled) {
+        settled = true;
+        el.removeAttribute("src");
+        resolve(value);
+      }
+    };
+    const timer = window.setTimeout(() => finish(null), 20000);
+    el.preload = "auto";
+    el.muted = true;
+    el.onloadedmetadata = (): void => {
+      el.currentTime = time;
+    };
+    el.onseeked = (): void => {
+      if (el.videoWidth === 0) {
+        window.clearTimeout(timer);
+        finish(null);
+        return;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = el.videoWidth;
+      canvas.height = el.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (ctx === null) {
+        window.clearTimeout(timer);
+        finish(null);
+        return;
+      }
+      ctx.drawImage(el, 0, 0);
+      canvas.toBlob((blob: Blob | null) => {
+        if (blob === null) {
+          window.clearTimeout(timer);
+          finish(null);
+          return;
+        }
+        blobToBase64(blob).then(
+          (base64: string | null): void => {
+            if (base64 === null) {
+              window.clearTimeout(timer);
+              finish(null);
+              return;
+            }
+            bridge.saveCapture(base64, time, kind, outputDir).then(
+              (saved: FrameGrab): void => {
+                window.clearTimeout(timer);
+                finish(saved.error === "" ? saved : null);
+              },
+              (): void => {
+                window.clearTimeout(timer);
+                finish(null);
+              }
+            );
+          },
+          (): void => {
+            window.clearTimeout(timer);
+            finish(null);
+          }
+        );
+      }, "image/png");
+    };
+    el.onerror = (): void => {
+      window.clearTimeout(timer);
+      finish(null);
+    };
+    el.src = toFileUrl(videoPath);
+  });
 }
 
 function defaultReferenceProfile(profile: string): string {
@@ -195,6 +346,7 @@ export default function App(): JSX.Element {
   const [lockTimes, setLockTimes] = useState<boolean>(true);
   const [grabbing, setGrabbing] = useState<string>("");
   const [videoNote, setVideoNote] = useState<string>("");
+  const [videoTools, setVideoTools] = useState<VideoTools | null>(null);
   const sourceVidRef = useRef<HTMLVideoElement | null>(null);
   const referenceVidRef = useRef<HTMLVideoElement | null>(null);
 
@@ -274,6 +426,14 @@ export default function App(): JSX.Element {
       },
       () => {
         setEnvChecking(false);
+      }
+    );
+    bridge.videoTools().then(
+      (tools) => {
+        setVideoTools(tools);
+      },
+      () => {
+        setVideoTools({ ffmpeg: false, ffprobe: false });
       }
     );
   }, []);
@@ -424,40 +584,68 @@ export default function App(): JSX.Element {
     );
   };
 
+  const applyProbe = (kind: string, probe: VideoProbe): void => {
+    if (kind === "source") {
+      setSourceProbe(probe);
+      if (probe.error === "" && probe.duration > 0) {
+        setSourceTime((prev) => Math.min(Math.max(prev, 0), probe.duration));
+      }
+    } else {
+      setReferenceProbe(probe);
+      if (probe.error === "" && probe.duration > 0) {
+        setReferenceTime((prev) => Math.min(Math.max(prev, 0), probe.duration));
+      }
+    }
+  };
+
   const refreshProbe = (kind: string, videoPath: string): void => {
-    const bridge = getBridge();
-    if (bridge === null || videoPath.trim() === "") {
+    if (videoPath.trim() === "") {
       return;
     }
-    bridge.probeVideo(videoPath).then(
-      (probe) => {
-        if (kind === "source") {
-          setSourceProbe(probe);
-          if (probe.error === "" && probe.duration > 0) {
-            setSourceTime((prev) => Math.min(Math.max(prev, 0), probe.duration));
+    const canProbeDetail = videoTools === null || videoTools.ffprobe;
+    probeWithElement(videoPath).then(
+      (chromium: VideoProbe | null): void => {
+        const bridge = getBridge();
+        if (chromium !== null) {
+          if (bridge === null || !canProbeDetail) {
+            applyProbe(kind, chromium);
+            return;
           }
-        } else {
-          setReferenceProbe(probe);
-          if (probe.error === "" && probe.duration > 0) {
-            setReferenceTime((prev) => Math.min(Math.max(prev, 0), probe.duration));
+          bridge.probeVideo(videoPath).then(
+            (detail) => {
+              if (detail.error === "") {
+                const enriched: VideoProbe = { ...chromium, codec: detail.codec, fps: detail.fps };
+                applyProbe(kind, enriched);
+              } else {
+                applyProbe(kind, chromium);
+              }
+            },
+            () => {
+              applyProbe(kind, chromium);
+            }
+          );
+          return;
+        }
+        if (bridge === null) {
+          return;
+        }
+        bridge.probeVideo(videoPath).then(
+          (probe) => {
+            applyProbe(kind, probe);
+          },
+          () => {
+            const failed: VideoProbe = {
+              path: videoPath,
+              duration: -1,
+              width: 0,
+              height: 0,
+              fps: "unknown",
+              codec: "unknown",
+              error: "Probe was unavailable."
+            };
+            applyProbe(kind, failed);
           }
-        }
-      },
-      () => {
-        const failed: VideoProbe = {
-          path: videoPath,
-          duration: -1,
-          width: 0,
-          height: 0,
-          fps: "unknown",
-          codec: "unknown",
-          error: "Probe was unavailable."
-        };
-        if (kind === "source") {
-          setSourceProbe(failed);
-        } else {
-          setReferenceProbe(failed);
-        }
+        );
       }
     );
   };
@@ -547,23 +735,33 @@ export default function App(): JSX.Element {
     }
     setGrabbing(kind);
     setVideoNote("Grabbing " + kind + " frame at " + atTime.toFixed(2) + "s.");
-    bridge.grabFrame(videoPath, atTime, kind, dirOfCube(outputCube)).then(
-      (grab) => {
-        setGrabbing("");
-        if (grab.error !== "") {
-          setVideoNote(kind + " capture failed: " + grab.error);
+    const outDir = dirOfCube(outputCube);
+    const useGrab = (grab: FrameGrab, via: string): void => {
+      setGrabbing("");
+      if (grab.error !== "") {
+        setVideoNote(kind + " capture failed: " + grab.error);
+        return;
+      }
+      if (kind === "source") {
+        setSourceFrames((prev) => dedupeAppend(prev, [grab.framePath]));
+      } else {
+        setReferenceFrames((prev) => dedupeAppend(prev, [grab.framePath]));
+      }
+      setVideoNote("Captured " + kind + " frame at " + grab.timestamp.toFixed(2) + "s (" + via + ").");
+    };
+    captureWithElement(bridge, videoPath, atTime, kind, outDir).then(
+      (chromium: FrameGrab | null): void => {
+        if (chromium !== null) {
+          useGrab(chromium, "Chromium");
           return;
         }
-        if (kind === "source") {
-          setSourceFrames((prev) => dedupeAppend(prev, [grab.framePath]));
-        } else {
-          setReferenceFrames((prev) => dedupeAppend(prev, [grab.framePath]));
-        }
-        setVideoNote("Captured " + kind + " frame at " + grab.timestamp.toFixed(2) + "s.");
-      },
-      () => {
-        setGrabbing("");
-        setVideoNote(kind + " capture was unavailable.");
+        bridge.grabFrame(videoPath, atTime, kind, outDir).then(
+          (grab) => useGrab(grab, "FFmpeg"),
+          () => {
+            setGrabbing("");
+            setVideoNote(kind + " capture was unavailable.");
+          }
+        );
       }
     );
   };
@@ -583,7 +781,12 @@ export default function App(): JSX.Element {
     const outDir = dirOfCube(outputCube);
     setGrabbing("both");
     setVideoNote("Grabbing both frames at " + at.toFixed(2) + "s.");
-    bridge.grabFrame(sourceVideo, clampedSource, "source", outDir).then(
+    const captureOne = (videoPath: string, time: number, kind: string): Promise<FrameGrab> =>
+      captureWithElement(bridge, videoPath, time, kind, outDir).then(
+        (chromium: FrameGrab | null): Promise<FrameGrab> =>
+          chromium !== null ? Promise.resolve(chromium) : bridge.grabFrame(videoPath, time, kind, outDir)
+      );
+    captureOne(sourceVideo, clampedSource, "source").then(
       (src) => {
         if (src.error !== "") {
           setGrabbing("");
@@ -591,7 +794,7 @@ export default function App(): JSX.Element {
           return;
         }
         setSourceFrames((prev) => dedupeAppend(prev, [src.framePath]));
-        bridge.grabFrame(referenceVideo, at, "reference", outDir).then(
+        captureOne(referenceVideo, at, "reference").then(
           (ref) => {
             setGrabbing("");
             if (ref.error !== "") {
@@ -793,12 +996,7 @@ export default function App(): JSX.Element {
         setReferenceProbe(null);
       }
     };
-    const meta =
-      probe === null
-        ? "No probe yet. Browse a file to read duration."
-        : probe.error !== ""
-          ? probe.error
-          : probe.width + "x" + probe.height + " " + probe.codec + " " + probe.fps + " fps, " + formatSeconds(probe.duration);
+    const meta = probeMetaText(probe);
     return (
       <div className="video-block">
         <span className="video-title">{isSource ? "Source video (ungraded)" : "Reference video (graded)"}</span>
@@ -910,7 +1108,8 @@ export default function App(): JSX.Element {
             <h2>Video import</h2>
             <p className="hint">
               Import the ungraded and graded videos, scrub to a frame, then capture it into the frame lists
-              below. Captures land in video_frames next to the output cube.
+              below. Captures land in video_frames next to the output cube. Chromium captures first;
+              system FFmpeg on PATH is the fallback for codecs Chromium cannot play.
             </p>
             {!desktop && (
               <div className="notice">
@@ -1375,7 +1574,7 @@ export default function App(): JSX.Element {
             <pre className="log" ref={logRef} aria-label="Engine log" tabIndex={0}>
               {log === "" ? "No output yet." : log}
             </pre>
-            <div className="footer">Preview encode and scopes arrive with the FFmpeg link.</div>
+            <div className="footer">Video import uses Chromium with system FFmpeg as fallback.</div>
           </section>
         </div>
       </div>

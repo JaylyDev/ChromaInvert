@@ -1,5 +1,16 @@
 # ChromaInvert Progress Log
 
+## 2026-11-06: GUI video import without bundled FFmpeg
+
+Completed:
+- Removed `ffmpeg-static` and `ffprobe-static` from `app/gui/package.json` (plus `asarUnpack` and per-OS prune blocks, the `ffprobe-static.d.ts` shim, and lockfile stanzas): installers no longer redistribute the standalone GPL ffmpeg and ffprobe binaries.
+- Video import is Chromium-first with system FFmpeg on PATH as fallback. Renderer probes with the `video` element and captures with `canvas` plus a new `video:saveCapture` main handler; `video:probe` and `video:grab` remain as PATH-only fallback for codecs Chromium cannot play. `webSecurity: false` allows `file://` video to canvas capture; the app loads only local files plus the dev server.
+- Codec and fps are optional: new `video:tools` IPC reports host `ffmpeg` and `ffprobe` presence, `refreshProbe` enriches the Chromium probe with ffprobe detail only when available, and the probe line hides `unknown` codec and fps tokens.
+
+Verified:
+- `npm run typecheck` and `npm run build` pass in `app/gui`; `python -m pytest engine/tests -q` gives 130 passed, 1 skipped.
+- `npm run dist` packs win32 x64 (Setup plus portable, unsigned) and `release/win-unpacked/ChromaInvert.exe` launches.
+
 ## 2026-11-05: Revert icon unpacking, mac and linux installers green again
 
 Completed:

@@ -3,10 +3,8 @@ import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve as resolvePath } from "node:path";
-import ffmpegStaticPath from "ffmpeg-static";
-import { path as ffprobeStaticPath } from "ffprobe-static";
 import type { FileFilter, IpcMainInvokeEvent, NativeImage } from "electron";
-import type { DoneResult, EnvStatus, FrameGrab, JobConfig, ProgressUpdate, SetupProgress, VideoProbe } from "./types";
+import type { DoneResult, EnvStatus, FrameGrab, JobConfig, ProgressUpdate, SetupProgress, VideoProbe, VideoTools } from "./types";
 
 interface ProgressLine {
   event: string;
@@ -186,6 +184,25 @@ function grabFrameAt(videoPath: string, timestamp: number, kind: string, outputD
   });
 }
 
+function saveCapturePng(pngBase64: string, kind: string, timestamp: number, outputDir: string): Promise<FrameGrab> {
+  const time = Number.isFinite(timestamp) && timestamp >= 0 ? timestamp : 0;
+  const safeKind = kind === "source" || kind === "reference" ? kind : "frame";
+  if (pngBase64.trim() === "") {
+    return Promise.resolve({ framePath: "", timestamp: time, error: "Canvas produced no image data." });
+  }
+  const baseDir = outputDir.trim() === "" ? "work" : outputDir.trim();
+  const workdirAbs = resolvePath(process.cwd(), baseDir);
+  const stampText = time.toFixed(2).replace(".", "p");
+  const fileName = safeKind + "_" + stampText + "s_" + String(Date.now() % 100000) + ".png";
+  const absOut = join(workdirAbs, "video_frames", fileName);
+  return mkdir(dirname(absOut), { recursive: true }).then(() =>
+    writeFile(absOut, Buffer.from(pngBase64, "base64")).then(
+      (): FrameGrab => ({ framePath: absOut, timestamp: time, error: "" }),
+      (err: Error): FrameGrab => ({ framePath: "", timestamp: time, error: String(err.message ?? err).slice(-300) })
+    )
+  );
+}
+
 function isProgressLine(value: unknown): value is ProgressLine {
   if (typeof value !== "object" || value === null) {
     return false;
@@ -248,20 +265,6 @@ interface ToolResolution {
   source: string;
 }
 
-function unpackedPath(path: string): string {
-  if (app.isPackaged) {
-    return path.replace("app.asar", "app.asar.unpacked");
-  }
-  return path;
-}
-
-function isFile(path: string): Promise<boolean> {
-  return stat(path).then(
-    (info) => info.isFile(),
-    () => false
-  );
-}
-
 function onPath(command: string): boolean {
   const target = command.trim();
   if (target === "") {
@@ -284,22 +287,14 @@ function resolveTool(kind: ToolKind): Promise<ToolResolution | null> {
     return Promise.resolve(null);
   }
   const name = kind === ToolKind.Ffmpeg ? "ffmpeg" : "ffprobe";
-  const staticPath = kind === ToolKind.Ffmpeg ? ffmpegStaticPath : ffprobeStaticPath;
-  const bundled: string | null = staticPath === null || staticPath === "" ? null : unpackedPath(staticPath);
-  const checkBundled: Promise<ToolResolution | null> = bundled === null
-    ? Promise.resolve(null)
-    : isFile(bundled).then((present): ToolResolution | null =>
-        present ? { command: bundled, prefixArgs: [], source: "bundled " + name } : null
-      );
-  return checkBundled.then((found): ToolResolution | null => {
-    if (found !== null) {
-      return found;
-    }
-    if (onPath(name)) {
-      return { command: name, prefixArgs: [], source: "PATH" };
-    }
-    return null;
-  });
+  if (onPath(name)) {
+    return Promise.resolve({ command: name, prefixArgs: [], source: "PATH" });
+  }
+  return Promise.resolve(null);
+}
+
+function checkVideoTools(): VideoTools {
+  return { ffmpeg: onPath("ffmpeg"), ffprobe: onPath("ffprobe") };
 }
 
 function missingToolMessage(kind: ToolKind): string {
@@ -307,7 +302,7 @@ function missingToolMessage(kind: ToolKind): string {
     return "No engine found: install the engine via pip (pip install chromainvert), or press Install in the Environment setup.";
   }
   const name = kind === ToolKind.Ffmpeg ? "ffmpeg" : "ffprobe";
-  return name + " was not found: reinstall the ChromaInvert app, which ships " + name + ", or install FFmpeg and put it on PATH.";
+  return name + " was not found on PATH: install FFmpeg from https://ffmpeg.org/download.html and restart the app.";
 }
 
 interface EnvProbe {
@@ -426,6 +421,8 @@ function windowIcon(): NativeImage {
 }
 
 function createWindow(): void {
+  const devUrl = process.env.VITE_DEV_SERVER_URL;
+  const isDev = devUrl !== undefined && devUrl !== "";
   const win = new BrowserWindow({
     width: 1180,
     height: 820,
@@ -434,11 +431,12 @@ function createWindow(): void {
     title: "ChromaInvert",
     autoHideMenuBar: true,
     icon: windowIcon(),
-    webPreferences: { preload: join(__dirname, "preload.js") }
+    // Relaxed only in dev so http:// dev server can draw file:// video to canvas.
+    // Production keeps the same-origin policy; packaged capture uses file:// throughout.
+    webPreferences: { preload: join(__dirname, "preload.js"), webSecurity: !isDev }
   });
   win.setMenu(null);
-  const devUrl = process.env.VITE_DEV_SERVER_URL;
-  if (devUrl !== undefined && devUrl !== "") {
+  if (isDev) {
     void win.loadURL(devUrl);
   } else {
     void win.loadFile(join(app.getAppPath(), "dist", "index.html"));
@@ -502,6 +500,11 @@ ipcMain.handle("video:pickReference", (event: IpcMainInvokeEvent): Promise<strin
 });
 
 ipcMain.handle(
+  "video:tools",
+  (): Promise<VideoTools> => Promise.resolve(checkVideoTools())
+);
+
+ipcMain.handle(
   "video:probe",
   (event: IpcMainInvokeEvent, videoPath: string): Promise<VideoProbe> => probeVideoPath(videoPath)
 );
@@ -515,6 +518,17 @@ ipcMain.handle(
     kind: string,
     outputDir: string
   ): Promise<FrameGrab> => grabFrameAt(videoPath, timestamp, kind, outputDir)
+);
+
+ipcMain.handle(
+  "video:saveCapture",
+  (
+    event: IpcMainInvokeEvent,
+    pngBase64: string,
+    timestamp: number,
+    kind: string,
+    outputDir: string
+  ): Promise<FrameGrab> => saveCapturePng(pngBase64, kind, timestamp, outputDir)
 );
 
 ipcMain.handle(
