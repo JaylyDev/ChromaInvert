@@ -1,5 +1,18 @@
 # ChromaInvert Progress Log
 
+## 2026-11-06: Engine resolution skipped the app itself
+
+Completed:
+- Root cause of silent Done runs: on Windows a bare name resolves the working directory first, and the portable plus unpacked app directories hold our own exe, which matches `chromainvert` case-blind. Match was spawning a copy of the app (extra window before the lock, instant exit 0 after it) instead of the Python engine. Verified with the OS lookup from the unpacked dir: unfiltered it returns our exe, filtered it returns the pip engine.
+- `resolveTool` now drops any candidate equal to `process.execPath` (case-blind) when resolving the engine, so the app can no longer mistake itself for the engine.
+
+## 2026-11-06: Match diagnostics and absolute tool resolution
+
+Completed:
+- `resolveTool` in `app/gui/electron/main.ts` now resolves the engine and system ffmpeg/ffprobe to absolute PATH entries before spawn, so a same-named file in the working directory can no longer shadow the intended binary on Windows.
+- The run log now records the exact command plus job path and the engine exit code, all sender traffic is guarded with `isDestroyed`, and the Done summary shows the absolute cube path instead of the typed relative path.
+- Verified `npm run typecheck` and `npm run build` pass in `app/gui`.
+
 ## 2026-11-06: GUI video import without bundled FFmpeg
 
 Completed:

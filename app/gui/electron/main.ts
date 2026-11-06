@@ -265,30 +265,49 @@ interface ToolResolution {
   source: string;
 }
 
-function onPath(command: string): boolean {
+function whichAll(command: string): string[] {
   const target = command.trim();
   if (target === "") {
-    return false;
+    return [];
   }
   const probed = process.platform === "win32"
     ? spawnSync("where", [target], { encoding: "utf8" })
     : spawnSync("sh", ["-c", "command -v " + target], { encoding: "utf8" });
-  return probed.status === 0;
+  if (probed.status !== 0) {
+    return [];
+  }
+  return String(probed.stdout ?? "").split(/\r?\n/).map((s) => s.trim()).filter((s) => s !== "");
+}
+
+function whichPath(command: string): string | null {
+  const found = whichAll(command);
+  return found.length > 0 ? found[0] : null;
+}
+
+function onPath(command: string): boolean {
+  return whichPath(command) !== null;
 }
 
 function resolveTool(kind: ToolKind): Promise<ToolResolution | null> {
   if (kind === ToolKind.Engine) {
-    if (onPath("chromainvert")) {
-      return Promise.resolve({ command: "chromainvert", prefixArgs: [], source: "PATH" });
+    // Bare names resolve the working directory first on Windows, and the
+    // portable app directory holds our own exe, which matches case-blind.
+    // Never mistake ourselves for the engine.
+    const selfExe = process.execPath.toLowerCase();
+    const exe = whichAll("chromainvert").find((p: string): boolean => p.toLowerCase() !== selfExe) ?? null;
+    if (exe !== null) {
+      return Promise.resolve({ command: exe, prefixArgs: [], source: "PATH" });
     }
-    if (onPath("python")) {
-      return Promise.resolve({ command: "python", prefixArgs: ["-m", "chromainvert"], source: "system Python" });
+    const py = whichPath("python");
+    if (py !== null) {
+      return Promise.resolve({ command: py, prefixArgs: ["-m", "chromainvert"], source: "system Python" });
     }
     return Promise.resolve(null);
   }
   const name = kind === ToolKind.Ffmpeg ? "ffmpeg" : "ffprobe";
-  if (onPath(name)) {
-    return Promise.resolve({ command: name, prefixArgs: [], source: "PATH" });
+  const found = whichPath(name);
+  if (found !== null) {
+    return Promise.resolve({ command: found, prefixArgs: [], source: "PATH" });
   }
   return Promise.resolve(null);
 }
@@ -375,6 +394,9 @@ let setupChild: ChildProcess | null = null;
 let currentChild: ChildProcess | null = null;
 
 function parseLine(line: string, sender: Electron.WebContents): void {
+  if (sender.isDestroyed()) {
+    return;
+  }
   if (!line.startsWith("{")) {
     sender.send("job:log", line);
     return;
@@ -636,10 +658,14 @@ ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promi
           if (engine === null) {
             return Promise.resolve({ exitCode: 1, summary: missingToolMessage(ToolKind.Engine) });
           }
-          sender.send("job:log", "engine: " + engine.source);
+          if (!sender.isDestroyed()) {
+            sender.send("job:log", "engine: " + engine.source + " (" + engine.command + ")");
+            sender.send("job:log", "run: " + engine.command + " run " + jobPath);
+          }
           return new Promise<DoneResult>((resolve) => {
             const child: ChildProcess = spawn(engine.command, [...engine.prefixArgs, "run", jobPath], {
-              cwd: process.cwd()
+              cwd: process.cwd(),
+              windowsHide: true
             });
             currentChild = child;
             let tail = "";
@@ -662,16 +688,21 @@ ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promi
               }
             });
             child.stderr?.on("data", (chunk: Buffer) => {
-              sender.send("job:log", chunk.toString("utf8").trim());
+              if (!sender.isDestroyed()) {
+                sender.send("job:log", chunk.toString("utf8").trim());
+              }
             });
             child.on("error", (err: Error) => {
               finish({ exitCode: 1, summary: "Engine failed to start from " + engine.source + ": " + err.message });
             });
             child.on("close", (code: number | null) => {
               const exitCode = code ?? 1;
+              if (!sender.isDestroyed()) {
+                sender.send("job:log", "engine exit: " + exitCode);
+              }
               finish({
                 exitCode,
-                summary: exitCode === 0 ? "Done: " + payload.outputCube : "Failed: " + tail.slice(-500)
+                summary: exitCode === 0 ? "Done: " + job.output_cube : "Failed: " + tail.slice(-500)
               });
             });
           });
@@ -703,7 +734,8 @@ ipcMain.handle("env:setup", (event: IpcMainInvokeEvent): Promise<DoneResult> => 
   sender.send("setup:log", "Installing chromainvert from PyPI (engine plus torch, numpy, imageio). This can take several minutes.");
   return new Promise<DoneResult>((resolve) => {
     const child: ChildProcess = spawn("python", ["-m", "pip", "install", "chromainvert"], {
-      cwd: process.cwd()
+      cwd: process.cwd(),
+      windowsHide: true
     });
     setupChild = child;
     let tail = "";
@@ -772,10 +804,29 @@ ipcMain.handle("env:cancel", (): Promise<void> => {
 // Taskbar grouping and icon identity on Windows key off this value.
 app.setAppUserModelId("com.chromainvert.gui");
 
-void app.whenReady().then(() => {
-  Menu.setApplicationMenu(null);
-  createWindow();
-});
+// One instance only: a second launch focuses the running window instead of
+// fighting it over the shared Chromium storage, which logs cache errors.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    const wins = BrowserWindow.getAllWindows();
+    if (wins.length === 0) {
+      createWindow();
+    } else {
+      const win = wins[0];
+      if (win.isMinimized()) {
+        win.restore();
+      }
+      win.focus();
+    }
+  });
+  void app.whenReady().then(() => {
+    Menu.setApplicationMenu(null);
+    createWindow();
+  });
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
