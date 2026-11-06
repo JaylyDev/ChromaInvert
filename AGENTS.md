@@ -67,7 +67,7 @@ From the repo root (Windows PowerShell):
 
 ## Workflow
 
-- Version is `0.1.0` in `engine/pyproject.toml`; releases are tagged `v0.1.0`, `v0.2.0`, and so on.
+- Version is `0.2.0` in `engine/pyproject.toml`; releases are tagged `v0.1.0`, `v0.2.0`, and so on.
 - Use semantic commits with a scope on every commit: `type(scope): subject`. Scopes are `engine`, `app`, `scripts`, `docs`, or `repo`. Examples: `feat(engine): add covariance matching loss`, `fix(scripts): quote ffmpeg filter path`, `chore(repo): harden packaging metadata`, `docs(plan): clarify tetrahedral check`.
 - Only commit when a new feature is implemented.
 - Append each milestone to `docs/PROGRESS.md` in the same commit.
