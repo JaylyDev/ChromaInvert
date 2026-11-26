@@ -3,10 +3,8 @@ import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve as resolvePath } from "node:path";
-import ffmpegStaticPath from "ffmpeg-static";
-import { path as ffprobeStaticPath } from "ffprobe-static";
 import type { FileFilter, IpcMainInvokeEvent, NativeImage } from "electron";
-import type { DoneResult, EnvStatus, FrameGrab, JobConfig, ProgressUpdate, SetupProgress, VideoProbe } from "./types";
+import type { DoneResult, EnvStatus, FrameGrab, JobConfig, ProgressUpdate, SetupProgress, VideoProbe, VideoTools } from "./types";
 
 interface ProgressLine {
   event: string;
@@ -186,6 +184,25 @@ function grabFrameAt(videoPath: string, timestamp: number, kind: string, outputD
   });
 }
 
+function saveCapturePng(pngBase64: string, kind: string, timestamp: number, outputDir: string): Promise<FrameGrab> {
+  const time = Number.isFinite(timestamp) && timestamp >= 0 ? timestamp : 0;
+  const safeKind = kind === "source" || kind === "reference" ? kind : "frame";
+  if (pngBase64.trim() === "") {
+    return Promise.resolve({ framePath: "", timestamp: time, error: "Canvas produced no image data." });
+  }
+  const baseDir = outputDir.trim() === "" ? "work" : outputDir.trim();
+  const workdirAbs = resolvePath(process.cwd(), baseDir);
+  const stampText = time.toFixed(2).replace(".", "p");
+  const fileName = safeKind + "_" + stampText + "s_" + String(Date.now() % 100000) + ".png";
+  const absOut = join(workdirAbs, "video_frames", fileName);
+  return mkdir(dirname(absOut), { recursive: true }).then(() =>
+    writeFile(absOut, Buffer.from(pngBase64, "base64")).then(
+      (): FrameGrab => ({ framePath: absOut, timestamp: time, error: "" }),
+      (err: Error): FrameGrab => ({ framePath: "", timestamp: time, error: String(err.message ?? err).slice(-300) })
+    )
+  );
+}
+
 function isProgressLine(value: unknown): value is ProgressLine {
   if (typeof value !== "object" || value === null) {
     return false;
@@ -248,58 +265,55 @@ interface ToolResolution {
   source: string;
 }
 
-function unpackedPath(path: string): string {
-  if (app.isPackaged) {
-    return path.replace("app.asar", "app.asar.unpacked");
-  }
-  return path;
-}
-
-function isFile(path: string): Promise<boolean> {
-  return stat(path).then(
-    (info) => info.isFile(),
-    () => false
-  );
-}
-
-function onPath(command: string): boolean {
+function whichAll(command: string): string[] {
   const target = command.trim();
   if (target === "") {
-    return false;
+    return [];
   }
   const probed = process.platform === "win32"
     ? spawnSync("where", [target], { encoding: "utf8" })
     : spawnSync("sh", ["-c", "command -v " + target], { encoding: "utf8" });
-  return probed.status === 0;
+  if (probed.status !== 0) {
+    return [];
+  }
+  return String(probed.stdout ?? "").split(/\r?\n/).map((s) => s.trim()).filter((s) => s !== "");
+}
+
+function whichPath(command: string): string | null {
+  const found = whichAll(command);
+  return found.length > 0 ? found[0] : null;
+}
+
+function onPath(command: string): boolean {
+  return whichPath(command) !== null;
 }
 
 function resolveTool(kind: ToolKind): Promise<ToolResolution | null> {
   if (kind === ToolKind.Engine) {
-    if (onPath("chromainvert")) {
-      return Promise.resolve({ command: "chromainvert", prefixArgs: [], source: "PATH" });
+    // Bare names resolve the working directory first on Windows, and the
+    // portable app directory holds our own exe, which matches case-blind.
+    // Never mistake ourselves for the engine.
+    const selfExe = process.execPath.toLowerCase();
+    const exe = whichAll("chromainvert").find((p: string): boolean => p.toLowerCase() !== selfExe) ?? null;
+    if (exe !== null) {
+      return Promise.resolve({ command: exe, prefixArgs: [], source: "PATH" });
     }
-    if (onPath("python")) {
-      return Promise.resolve({ command: "python", prefixArgs: ["-m", "chromainvert"], source: "system Python" });
+    const py = whichPath("python");
+    if (py !== null) {
+      return Promise.resolve({ command: py, prefixArgs: ["-m", "chromainvert"], source: "system Python" });
     }
     return Promise.resolve(null);
   }
   const name = kind === ToolKind.Ffmpeg ? "ffmpeg" : "ffprobe";
-  const staticPath = kind === ToolKind.Ffmpeg ? ffmpegStaticPath : ffprobeStaticPath;
-  const bundled: string | null = staticPath === null || staticPath === "" ? null : unpackedPath(staticPath);
-  const checkBundled: Promise<ToolResolution | null> = bundled === null
-    ? Promise.resolve(null)
-    : isFile(bundled).then((present): ToolResolution | null =>
-        present ? { command: bundled, prefixArgs: [], source: "bundled " + name } : null
-      );
-  return checkBundled.then((found): ToolResolution | null => {
-    if (found !== null) {
-      return found;
-    }
-    if (onPath(name)) {
-      return { command: name, prefixArgs: [], source: "PATH" };
-    }
-    return null;
-  });
+  const found = whichPath(name);
+  if (found !== null) {
+    return Promise.resolve({ command: found, prefixArgs: [], source: "PATH" });
+  }
+  return Promise.resolve(null);
+}
+
+function checkVideoTools(): VideoTools {
+  return { ffmpeg: onPath("ffmpeg"), ffprobe: onPath("ffprobe") };
 }
 
 function missingToolMessage(kind: ToolKind): string {
@@ -307,7 +321,7 @@ function missingToolMessage(kind: ToolKind): string {
     return "No engine found: install the engine via pip (pip install chromainvert), or press Install in the Environment setup.";
   }
   const name = kind === ToolKind.Ffmpeg ? "ffmpeg" : "ffprobe";
-  return name + " was not found: reinstall the ChromaInvert app, which ships " + name + ", or install FFmpeg and put it on PATH.";
+  return name + " was not found on PATH: install FFmpeg from https://ffmpeg.org/download.html and restart the app.";
 }
 
 interface EnvProbe {
@@ -380,6 +394,9 @@ let setupChild: ChildProcess | null = null;
 let currentChild: ChildProcess | null = null;
 
 function parseLine(line: string, sender: Electron.WebContents): void {
+  if (sender.isDestroyed()) {
+    return;
+  }
   if (!line.startsWith("{")) {
     sender.send("job:log", line);
     return;
@@ -426,6 +443,8 @@ function windowIcon(): NativeImage {
 }
 
 function createWindow(): void {
+  const devUrl = process.env.VITE_DEV_SERVER_URL;
+  const isDev = devUrl !== undefined && devUrl !== "";
   const win = new BrowserWindow({
     width: 1180,
     height: 820,
@@ -434,11 +453,12 @@ function createWindow(): void {
     title: "ChromaInvert",
     autoHideMenuBar: true,
     icon: windowIcon(),
-    webPreferences: { preload: join(__dirname, "preload.js") }
+    // Relaxed only in dev so http:// dev server can draw file:// video to canvas.
+    // Production keeps the same-origin policy; packaged capture uses file:// throughout.
+    webPreferences: { preload: join(__dirname, "preload.js"), webSecurity: !isDev }
   });
   win.setMenu(null);
-  const devUrl = process.env.VITE_DEV_SERVER_URL;
-  if (devUrl !== undefined && devUrl !== "") {
+  if (isDev) {
     void win.loadURL(devUrl);
   } else {
     void win.loadFile(join(app.getAppPath(), "dist", "index.html"));
@@ -502,6 +522,11 @@ ipcMain.handle("video:pickReference", (event: IpcMainInvokeEvent): Promise<strin
 });
 
 ipcMain.handle(
+  "video:tools",
+  (): Promise<VideoTools> => Promise.resolve(checkVideoTools())
+);
+
+ipcMain.handle(
   "video:probe",
   (event: IpcMainInvokeEvent, videoPath: string): Promise<VideoProbe> => probeVideoPath(videoPath)
 );
@@ -515,6 +540,17 @@ ipcMain.handle(
     kind: string,
     outputDir: string
   ): Promise<FrameGrab> => grabFrameAt(videoPath, timestamp, kind, outputDir)
+);
+
+ipcMain.handle(
+  "video:saveCapture",
+  (
+    event: IpcMainInvokeEvent,
+    pngBase64: string,
+    timestamp: number,
+    kind: string,
+    outputDir: string
+  ): Promise<FrameGrab> => saveCapturePng(pngBase64, kind, timestamp, outputDir)
 );
 
 ipcMain.handle(
@@ -622,10 +658,14 @@ ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promi
           if (engine === null) {
             return Promise.resolve({ exitCode: 1, summary: missingToolMessage(ToolKind.Engine) });
           }
-          sender.send("job:log", "engine: " + engine.source);
+          if (!sender.isDestroyed()) {
+            sender.send("job:log", "engine: " + engine.source + " (" + engine.command + ")");
+            sender.send("job:log", "run: " + engine.command + " run " + jobPath);
+          }
           return new Promise<DoneResult>((resolve) => {
             const child: ChildProcess = spawn(engine.command, [...engine.prefixArgs, "run", jobPath], {
-              cwd: process.cwd()
+              cwd: process.cwd(),
+              windowsHide: true
             });
             currentChild = child;
             let tail = "";
@@ -648,16 +688,21 @@ ipcMain.handle("job:run", (event: IpcMainInvokeEvent, payload: JobConfig): Promi
               }
             });
             child.stderr?.on("data", (chunk: Buffer) => {
-              sender.send("job:log", chunk.toString("utf8").trim());
+              if (!sender.isDestroyed()) {
+                sender.send("job:log", chunk.toString("utf8").trim());
+              }
             });
             child.on("error", (err: Error) => {
               finish({ exitCode: 1, summary: "Engine failed to start from " + engine.source + ": " + err.message });
             });
             child.on("close", (code: number | null) => {
               const exitCode = code ?? 1;
+              if (!sender.isDestroyed()) {
+                sender.send("job:log", "engine exit: " + exitCode);
+              }
               finish({
                 exitCode,
-                summary: exitCode === 0 ? "Done: " + payload.outputCube : "Failed: " + tail.slice(-500)
+                summary: exitCode === 0 ? "Done: " + job.output_cube : "Failed: " + tail.slice(-500)
               });
             });
           });
@@ -689,7 +734,8 @@ ipcMain.handle("env:setup", (event: IpcMainInvokeEvent): Promise<DoneResult> => 
   sender.send("setup:log", "Installing chromainvert from PyPI (engine plus torch, numpy, imageio). This can take several minutes.");
   return new Promise<DoneResult>((resolve) => {
     const child: ChildProcess = spawn("python", ["-m", "pip", "install", "chromainvert"], {
-      cwd: process.cwd()
+      cwd: process.cwd(),
+      windowsHide: true
     });
     setupChild = child;
     let tail = "";
@@ -758,10 +804,29 @@ ipcMain.handle("env:cancel", (): Promise<void> => {
 // Taskbar grouping and icon identity on Windows key off this value.
 app.setAppUserModelId("com.chromainvert.gui");
 
-void app.whenReady().then(() => {
-  Menu.setApplicationMenu(null);
-  createWindow();
-});
+// One instance only: a second launch focuses the running window instead of
+// fighting it over the shared Chromium storage, which logs cache errors.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    const wins = BrowserWindow.getAllWindows();
+    if (wins.length === 0) {
+      createWindow();
+    } else {
+      const win = wins[0];
+      if (win.isMinimized()) {
+        win.restore();
+      }
+      win.focus();
+    }
+  });
+  void app.whenReady().then(() => {
+    Menu.setApplicationMenu(null);
+    createWindow();
+  });
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

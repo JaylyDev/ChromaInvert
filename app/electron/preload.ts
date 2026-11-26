@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
-import type { DoneResult, EnvStatus, FrameGrab, JobConfig, ProgressUpdate, SetupProgress, VideoProbe } from "./types";
+import type { DoneResult, EnvStatus, FrameGrab, JobConfig, ProgressUpdate, SetupProgress, VideoProbe, VideoTools } from "./types";
 
 contextBridge.exposeInMainWorld("chromainvert", {
   runJob: (config: JobConfig): Promise<DoneResult> => ipcRenderer.invoke("job:run", config),
@@ -9,9 +9,12 @@ contextBridge.exposeInMainWorld("chromainvert", {
   pickReferenceFrames: (): Promise<string[]> => ipcRenderer.invoke("job:pickReferences"),
   pickSourceVideo: (): Promise<string | null> => ipcRenderer.invoke("video:pickSource"),
   pickReferenceVideo: (): Promise<string | null> => ipcRenderer.invoke("video:pickReference"),
+  videoTools: (): Promise<VideoTools> => ipcRenderer.invoke("video:tools"),
   probeVideo: (videoPath: string): Promise<VideoProbe> => ipcRenderer.invoke("video:probe", videoPath),
   grabFrame: (videoPath: string, timestamp: number, kind: string, outputDir: string): Promise<FrameGrab> =>
     ipcRenderer.invoke("video:grab", videoPath, timestamp, kind, outputDir),
+  saveCapture: (pngBase64: string, timestamp: number, kind: string, outputDir: string): Promise<FrameGrab> =>
+    ipcRenderer.invoke("video:saveCapture", pngBase64, timestamp, kind, outputDir),
   pickOutputCube: (suggestedPath: string): Promise<string | null> =>
     ipcRenderer.invoke("job:pickOutput", suggestedPath),
   pickWeights: (): Promise<string | null> => ipcRenderer.invoke("job:pickWeights"),
