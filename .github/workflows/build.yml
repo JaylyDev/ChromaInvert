@@ -14,14 +14,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     defaults:
       run:
-        working-directory: app/gui
+        working-directory: app
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: app/gui/package-lock.json
+          cache-dependency-path: app/package-lock.json
       - name: Install GUI deps
         run: npm ci
       - name: Typecheck GUI
@@ -34,5 +34,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: chromainvert-${{ matrix.os }}
-          path: app/gui/release/*
+          path: app/release/*
 
